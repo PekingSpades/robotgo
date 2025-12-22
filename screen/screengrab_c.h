@@ -15,8 +15,9 @@
 #endif
 #include "screen_c.h"
 
-#if defined(IS_MACOSX) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ > 140400
-	static CGImageRef capture15(CGDirectDisplayID id, CGRect diIntersectDisplayLocal, CGColorSpaceRef colorSpace) {
+#if defined(IS_MACOSX)
+	// ScreenCaptureKit API - requires macOS 14.4+
+	static CGImageRef capture15(CGDirectDisplayID id, CGRect diIntersectDisplayLocal, CGColorSpaceRef colorSpace) API_AVAILABLE(macos(14.4)) {
 		dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
 		__block CGImageRef image1 = nil;
 		[SCShareableContent getShareableContentWithCompletionHandler:^(SCShareableContent* content, NSError* error) {
@@ -76,14 +77,18 @@ MMBitmapRef copyMMBitmapFromDisplayInRect(MMRectInt32 rect, int32_t display_id, 
 	}
 
 	MMPointInt32 o = rect.origin; MMSizeInt32 s = rect.size;
-	#if __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ > 140400
+
+	// Runtime version check instead of compile-time macro
+	CGImageRef image = NULL;
+	if (@available(macOS 14.4, *)) {
+		// macOS 14.4+: use ScreenCaptureKit (CGDisplayCreateImageForRect is deprecated)
 		CGColorSpaceRef color = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-		CGImageRef image = capture15(displayID, CGRectMake(o.x, o.y, s.w, s.h), color);
+		image = capture15(displayID, CGRectMake(o.x, o.y, s.w, s.h), color);
 		CGColorSpaceRelease(color);
-	#else
-		// This API is deprecated in macos 15, use ScreenCaptureKit's captureScreenshot
-		CGImageRef image = CGDisplayCreateImageForRect(displayID, CGRectMake(o.x, o.y, s.w, s.h));
-	#endif
+	} else {
+		// macOS 13 and earlier: use legacy API
+		image = CGDisplayCreateImageForRect(displayID, CGRectMake(o.x, o.y, s.w, s.h));
+	}
 	if (!image) { return NULL; }
 	
 	CFDataRef imageData = CGDataProviderCopyData(CGImageGetDataProvider(image));
