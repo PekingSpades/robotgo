@@ -5,7 +5,10 @@
 	#include <OpenGL/OpenGL.h>
 	#include <OpenGL/gl.h>
 	#include <ApplicationServices/ApplicationServices.h>
-	#include <ScreenCaptureKit/ScreenCaptureKit.h>
+	#if __has_include(<ScreenCaptureKit/ScreenCaptureKit.h>)
+		#include <ScreenCaptureKit/ScreenCaptureKit.h>
+		#define HAS_SCREENCAPTUREKIT 1
+	#endif
 #elif defined(USE_X11)
 	#include <X11/Xlib.h>
 	#include <X11/Xutil.h>
@@ -15,7 +18,7 @@
 #endif
 #include "screen_c.h"
 
-#if defined(IS_MACOSX)
+#if defined(IS_MACOSX) && defined(HAS_SCREENCAPTUREKIT)
 	// ScreenCaptureKit API - requires macOS 14.4+
 	static CGImageRef capture15(CGDirectDisplayID id, CGRect diIntersectDisplayLocal, CGColorSpaceRef colorSpace) API_AVAILABLE(macos(14.4)) {
 		dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
@@ -80,13 +83,16 @@ MMBitmapRef copyMMBitmapFromDisplayInRect(MMRectInt32 rect, int32_t display_id, 
 
 	// Runtime version check instead of compile-time macro
 	CGImageRef image = NULL;
+#ifdef HAS_SCREENCAPTUREKIT
 	if (@available(macOS 14.4, *)) {
 		// macOS 14.4+: use ScreenCaptureKit (CGDisplayCreateImageForRect is deprecated)
 		CGColorSpaceRef color = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
 		image = capture15(displayID, CGRectMake(o.x, o.y, s.w, s.h), color);
 		CGColorSpaceRelease(color);
-	} else {
-		// macOS 13 and earlier: use legacy API
+	} else
+#endif
+	{
+		// macOS 13 and earlier or SDK without ScreenCaptureKit: use legacy API
 		image = CGDisplayCreateImageForRect(displayID, CGRectMake(o.x, o.y, s.w, s.h));
 	}
 	if (!image) { return NULL; }
