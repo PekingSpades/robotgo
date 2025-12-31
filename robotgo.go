@@ -683,9 +683,9 @@ func Click(args ...interface{}) {
 	}
 
 	if !double {
-		C.clickMouse(button)
+		C.multiClickErr(button, 1)
 	} else {
-		C.doubleClick(button)
+		C.multiClickErr(button, 2)
 	}
 
 	MilliSleep(MouseSleep)
@@ -723,27 +723,19 @@ func ClickE(args ...interface{}) error {
 
 	defer MilliSleep(MouseSleep)
 
-	if !double {
-		if code := C.toggleMouseErr(true, button); code != 0 {
-			return formatClickError(int(code), button, "down", false)
-		}
+	clickCount := 1
+	if double {
+		clickCount = 2
+	}
 
-		// match clickMouse timing
-		C.microsleep(C.double(5.0))
-
-		if code := C.toggleMouseErr(false, button); code != 0 {
-			return formatClickError(int(code), button, "up", false)
-		}
-	} else {
-		if code := C.doubleClickErr(button); code != 0 {
-			return formatClickError(int(code), button, "double", true)
-		}
+	if code := C.multiClickErr(button, C.int(clickCount)); code != 0 {
+		return formatClickError(int(code), button, clickCount)
 	}
 
 	return nil
 }
 
-func formatClickError(code int, button C.MMMouseButton, stage string, double bool) error {
+func formatClickError(code int, button C.MMMouseButton, clickCount int) error {
 	btnName := MouseButtonString(button)
 	detail := ""
 
@@ -776,10 +768,28 @@ func formatClickError(code int, button C.MMMouseButton, stage string, double boo
 	}
 
 	if detail != "" {
-		return fmt.Errorf("click %s failed (%s, double=%v): %s (code=%d)", stage, btnName, double, detail, code)
+		return fmt.Errorf("click failed (%s, count=%d): %s (code=%d)", btnName, clickCount, detail, code)
 	}
 
-	return fmt.Errorf("click %s failed (%s, double=%v), code=%d", stage, btnName, double, code)
+	return fmt.Errorf("click failed (%s, count=%d), code=%d", btnName, clickCount, code)
+}
+
+// MultiClickE performs multiple clicks and returns error
+//
+// robotgo.MultiClickE(button string, clickCount int)
+func MultiClickE(button string, clickCount int) error {
+	if clickCount < 1 {
+		return nil
+	}
+
+	btn := CheckMouse(button)
+	defer MilliSleep(MouseSleep)
+
+	if code := C.multiClickErr(btn, C.int(clickCount)); code != 0 {
+		return formatClickError(int(code), btn, clickCount)
+	}
+
+	return nil
 }
 
 // MoveClick move and click the mouse
@@ -824,7 +834,7 @@ func Toggle(key ...interface{}) error {
 	if len(key) > 1 && key[1].(string) == "up" {
 		down = false
 	}
-	C.toggleMouse(C.bool(down), button)
+	C.toggleMouseErr(C.bool(down), button)
 	if len(key) > 2 {
 		MilliSleep(MouseSleep)
 	}

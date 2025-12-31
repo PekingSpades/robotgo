@@ -195,42 +195,26 @@ int toggleMouseErr(bool down, MMMouseButton button) {
 	#endif
 }
 
-void toggleMouse(bool down, MMMouseButton button) {
-	toggleMouseErr(down, button);
-}
-
-int clickMouseErr(MMMouseButton button){
-	int err = toggleMouseErr(true, button);
-	if (err != 0) {
-		return err;
+/* Multi-click function supporting any click count (1=single, 2=double, 3=triple, etc.) */
+int multiClickErr(MMMouseButton button, int clickCount){
+	if (clickCount < 1) {
+		return 0;
 	}
 
-	microsleep(5.0);
-
-	return toggleMouseErr(false, button);
-}
-
-void clickMouse(MMMouseButton button){
-	clickMouseErr(button);
-}
-
-int doubleClickErr(MMMouseButton button){
 	#if defined(IS_MACOSX)
-		/* Double click for Mac. */
 		const CGPoint currentPos = CGPointFromMMPointInt32(location());
 		const CGEventType mouseTypeDown = MMMouseToCGEventType(true, button);
 		const CGEventType mouseTypeUP = MMMouseToCGEventType(false, button);
 
 		CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
-		CGEventRef event = CGEventCreateMouseEvent(source, mouseTypeDown, currentPos, kCGMouseButtonLeft);
+		CGEventRef event = CGEventCreateMouseEvent(source, mouseTypeDown, currentPos, (CGMouseButton)button);
 
 		if (event == NULL) {
 			CFRelease(source);
 			return (int)kCGErrorCannotComplete;
 		}
 
-		/* Set event to double click. */
-		CGEventSetIntegerValueField(event, kCGMouseEventClickState, 2);
+		CGEventSetIntegerValueField(event, kCGMouseEventClickState, clickCount);
 		CGEventPost(kCGHIDEventTap, event);
 
 		CGEventSetType(event, mouseTypeUP);
@@ -241,21 +225,23 @@ int doubleClickErr(MMMouseButton button){
 
 		return 0;
 	#else
-		/* Double click for everything else. */
-		int err = clickMouseErr(button);
-		if (err != 0) {
-			return err;
+		int i;
+		for (i = 0; i < clickCount; i++) {
+			int err = toggleMouseErr(true, button);
+			if (err != 0) {
+				return err;
+			}
+			microsleep(5.0);
+			err = toggleMouseErr(false, button);
+			if (err != 0) {
+				return err;
+			}
+			if (i < clickCount - 1) {
+				microsleep(200);
+			}
 		}
-
-		microsleep(200);
-
-		return clickMouseErr(button);
+		return 0;
 	#endif
-}
-
-/* Special function for sending double clicks, needed for MacOS. */
-void doubleClick(MMMouseButton button){
-	doubleClickErr(button);
 }
 
 /* Function used to scroll the screen in the required direction. */
