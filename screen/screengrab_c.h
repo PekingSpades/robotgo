@@ -89,12 +89,17 @@ MMBitmapRef copyMMBitmapFromDisplayInRect(MMRectInt32 rect, int32_t display_id, 
 		CGColorSpaceRef color = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
 		image = capture15(displayID, CGRectMake(o.x, o.y, s.w, s.h), color);
 		CGColorSpaceRelease(color);
-	} else
-#endif
-	{
-		// macOS 13 and earlier or SDK without ScreenCaptureKit: use legacy API
+	}
+#if __MAC_OS_X_VERSION_MIN_REQUIRED < 150000
+	else {
+		// Deployment target < macOS 15: legacy API available
 		image = CGDisplayCreateImageForRect(displayID, CGRectMake(o.x, o.y, s.w, s.h));
 	}
+#endif
+#else
+	// SDK without ScreenCaptureKit: use legacy API
+	image = CGDisplayCreateImageForRect(displayID, CGRectMake(o.x, o.y, s.w, s.h));
+#endif
 	if (!image) { return NULL; }
 	
 	CFDataRef imageData = CGDataProviderCopyData(CGImageGetDataProvider(image));

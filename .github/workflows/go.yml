@@ -23,13 +23,17 @@ jobs:
         run: |
           go get -v -t -d ./...
 
-      # Allow -weak_framework and framework names (used by robotgo for ScreenCaptureKit)
+      # Allow -weak_framework and set macOS deployment target for legacy API compatibility
       - name: Build
         run: go build -v .
         env:
           CGO_LDFLAGS_ALLOW: "-weak_framework|ScreenCaptureKit"
+          CGO_CFLAGS: "-mmacosx-version-min=11.0"
+          CGO_LDFLAGS: "-mmacosx-version-min=11.0"
       - name: Test
         run: go test -v robot_info_test.go
         env:
           CGO_LDFLAGS_ALLOW: "-weak_framework|ScreenCaptureKit"
+          CGO_CFLAGS: "-mmacosx-version-min=11.0"
+          CGO_LDFLAGS: "-mmacosx-version-min=11.0"
         # run: go test -v .
