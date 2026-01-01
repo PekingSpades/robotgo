@@ -23,8 +23,13 @@ jobs:
         run: |
           go get -v -t -d ./...
 
+      # Allow -weak_framework and framework names (used by robotgo for ScreenCaptureKit)
       - name: Build
         run: go build -v .
+        env:
+          CGO_LDFLAGS_ALLOW: "-weak_framework|ScreenCaptureKit"
       - name: Test
         run: go test -v robot_info_test.go
+        env:
+          CGO_LDFLAGS_ALLOW: "-weak_framework|ScreenCaptureKit"
         # run: go test -v .
