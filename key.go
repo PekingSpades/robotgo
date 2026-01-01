@@ -20,7 +20,6 @@ import "C"
 import (
 	"errors"
 	"math/rand"
-	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -202,6 +201,18 @@ const (
 	LightsKbdDown   = "lights_kbd_down"
 )
 
+// Modifier represents a keyboard modifier key (ctrl, alt, shift, cmd)
+type Modifier string
+
+// Modifier key constants
+const (
+	ModNone  Modifier = ""
+	ModAlt   Modifier = "alt"
+	ModCtrl  Modifier = "ctrl"
+	ModShift Modifier = "shift"
+	ModCmd   Modifier = "cmd" // macOS Command / Windows Win key
+)
+
 // keyNames define a map of key names to MMKeyCode
 var keyNames = map[string]C.MMKeyCode{
 	"backspace": C.K_BACKSPACE,
@@ -331,13 +342,6 @@ func CmdCtrl() string {
 	return "ctrl"
 }
 
-// It sends a key press and release to the active application
-func tapKeyCode(code C.MMKeyCode, flags C.MMKeyFlags, pid C.uintptr) {
-	C.toggleKeyCode(code, true, flags, pid)
-	MilliSleep(3)
-	C.toggleKeyCode(code, false, flags, pid)
-}
-
 var keyErr = errors.New("Invalid key flag specified.")
 
 func checkKeyCodes(k string) (key C.MMKeyCode, err error) {
@@ -405,60 +409,22 @@ func getFlagsFromValue(value []string) (flags C.MMKeyFlags) {
 	return
 }
 
-func upKeyArr(keyArr []string, pid int) {
-	for i := 0; i < len(keyArr); i++ {
-		key1, _ := checkKeyCodes(keyArr[i])
-		C.toggleKeyCode(key1, false, C.MOD_NONE, C.uintptr(pid))
+// modifiersToFlags converts Modifier slice to C.MMKeyFlags
+func modifiersToFlags(modifiers []Modifier) C.MMKeyFlags {
+	var flags C.MMKeyFlags = C.MOD_NONE
+	for _, m := range modifiers {
+		switch m {
+		case ModAlt:
+			flags |= C.MOD_ALT
+		case ModCtrl:
+			flags |= C.MOD_CONTROL
+		case ModShift:
+			flags |= C.MOD_SHIFT
+		case ModCmd:
+			flags |= C.MOD_META
+		}
 	}
-}
-
-func keyTaps(k string, keyArr []string, pid int) error {
-	flags := getFlagsFromValue(keyArr)
-	key, err := checkKeyCodes(k)
-	if err != nil {
-		return err
-	}
-
-	tapKeyCode(key, flags, C.uintptr(pid))
-	MilliSleep(KeySleep)
-	upKeyArr(keyArr, pid)
-	return nil
-}
-
-func getKeyDown(keyArr []string) (bool, []string) {
-	if len(keyArr) <= 0 {
-		keyArr = append(keyArr, "down")
-	}
-
-	down := true
-	if keyArr[0] == "up" {
-		down = false
-	}
-
-	if keyArr[0] == "up" || keyArr[0] == "down" {
-		keyArr = keyArr[1:]
-	}
-	return down, keyArr
-}
-
-func keyTogglesB(k string, down bool, keyArr []string, pid int) error {
-	flags := getFlagsFromValue(keyArr)
-	key, err := checkKeyCodes(k)
-	if err != nil {
-		return err
-	}
-
-	C.toggleKeyCode(key, C.bool(down), flags, C.uintptr(pid))
-	MilliSleep(KeySleep)
-	if !down {
-		upKeyArr(keyArr, pid)
-	}
-	return nil
-}
-
-func keyToggles(k string, keyArr []string, pid int) error {
-	down, keyArr1 := getKeyDown(keyArr)
-	return keyTogglesB(k, down, keyArr1, pid)
+	return flags
 }
 
 /*
@@ -514,7 +480,7 @@ func appendShift(key string, len1 int, args ...interface{}) (string, []interface
 	return key, args
 }
 
-// KeyTap taps the keyboard code;
+// KeyTap taps the keyboard code with optional modifier keys (atomic operation).
 //
 // See keys supported:
 //
@@ -522,46 +488,88 @@ func appendShift(key string, len1 int, args ...interface{}) (string, []interface
 //
 // Examples:
 //
-//	robotgo.KeySleep = 100 // 100 millisecond
 //	robotgo.KeyTap("a")
-//	robotgo.KeyTap("i", "alt", "command")
-//
-//	arr := []string{"alt", "command"}
-//	robotgo.KeyTap("i", arr)
-//
-//	robotgo.KeyTap("k", pid int)
-func KeyTap(key string, args ...interface{}) error {
-	var keyArr []string
-	key, args = appendShift(key, 0, args...)
+//	robotgo.KeyTap("c", robotgo.ModCtrl)
+//	robotgo.KeyTap("s", robotgo.ModCtrl, robotgo.ModShift)
+func KeyTap(key string, modifiers ...Modifier) error {
+	// Handle uppercase letters by adding shift modifier
+	if len(key) == 1 && unicode.IsUpper([]rune(key)[0]) {
+		modifiers = append(modifiers, ModShift)
+		key = strings.ToLower(key)
+	}
 
-	pid := 0
-	if len(args) > 0 {
-		if reflect.TypeOf(args[0]) == reflect.TypeOf(keyArr) {
-			keyArr = args[0].([]string)
-		} else {
-			if reflect.TypeOf(args[0]) == reflect.TypeOf(pid) {
-				pid = args[0].(int)
-				keyArr = ToStrings(args[1:])
-			} else {
-				keyArr = ToStrings(args)
+	// Handle special characters
+	if _, ok := Special[key]; ok {
+		key = Special[key]
+		// Add shift if not already present
+		hasShift := false
+		for _, m := range modifiers {
+			if m == ModShift {
+				hasShift = true
+				break
 			}
+		}
+		if !hasShift {
+			modifiers = append(modifiers, ModShift)
 		}
 	}
 
-	return keyTaps(key, keyArr, pid)
-}
-
-func getToggleArgs(args ...interface{}) (pid int, keyArr []string) {
-	if len(args) > 0 && reflect.TypeOf(args[0]) == reflect.TypeOf(pid) {
-		pid = args[0].(int)
-		keyArr = ToStrings(args[1:])
-	} else {
-		keyArr = ToStrings(args)
+	keyCode, err := checkKeyCodes(key)
+	if err != nil {
+		return err
 	}
-	return
+
+	flags := modifiersToFlags(modifiers)
+
+	// Atomic operation - C layer handles platform differences
+	C.keyTap(keyCode, flags)
+
+	MilliSleep(KeySleep)
+	return nil
 }
 
-// KeyToggle toggles the keyboard, if there not have args default is "down"
+// KeyTapWithPID taps the keyboard code on a specific process.
+//
+// Examples:
+//
+//	robotgo.KeyTapWithPID("v", pid, robotgo.ModCtrl)
+func KeyTapWithPID(key string, pid int, modifiers ...Modifier) error {
+	// Handle uppercase letters by adding shift modifier
+	if len(key) == 1 && unicode.IsUpper([]rune(key)[0]) {
+		modifiers = append(modifiers, ModShift)
+		key = strings.ToLower(key)
+	}
+
+	// Handle special characters
+	if _, ok := Special[key]; ok {
+		key = Special[key]
+		hasShift := false
+		for _, m := range modifiers {
+			if m == ModShift {
+				hasShift = true
+				break
+			}
+		}
+		if !hasShift {
+			modifiers = append(modifiers, ModShift)
+		}
+	}
+
+	keyCode, err := checkKeyCodes(key)
+	if err != nil {
+		return err
+	}
+
+	flags := modifiersToFlags(modifiers)
+
+	// PID-specific operation
+	C.keyTapPid(keyCode, flags, C.uintptr(pid))
+
+	MilliSleep(KeySleep)
+	return nil
+}
+
+// KeyToggle toggles a key up or down with optional modifier keys (atomic operation).
 //
 // See keys:
 //
@@ -569,38 +577,105 @@ func getToggleArgs(args ...interface{}) (pid int, keyArr []string) {
 //
 // Examples:
 //
-//	robotgo.KeyToggle("a")
-//	robotgo.KeyToggle("a", "up")
-//
-//	robotgo.KeyToggle("a", "up", "alt", "cmd")
-//	robotgo.KeyToggle("k", pid int)
-func KeyToggle(key string, args ...interface{}) error {
-	key, args = appendShift(key, 1, args...)
-	pid, keyArr := getToggleArgs(args...)
-	return keyToggles(key, keyArr, pid)
+//	robotgo.KeyToggle("a", true)              // press down
+//	robotgo.KeyToggle("a", false)             // release
+//	robotgo.KeyToggle("a", true, robotgo.ModCtrl)
+func KeyToggle(key string, down bool, modifiers ...Modifier) error {
+	// Handle uppercase letters
+	if len(key) == 1 && unicode.IsUpper([]rune(key)[0]) {
+		modifiers = append(modifiers, ModShift)
+		key = strings.ToLower(key)
+	}
+
+	// Handle special characters
+	if _, ok := Special[key]; ok {
+		key = Special[key]
+		hasShift := false
+		for _, m := range modifiers {
+			if m == ModShift {
+				hasShift = true
+				break
+			}
+		}
+		if !hasShift {
+			modifiers = append(modifiers, ModShift)
+		}
+	}
+
+	keyCode, err := checkKeyCodes(key)
+	if err != nil {
+		return err
+	}
+
+	flags := modifiersToFlags(modifiers)
+
+	// Atomic operation - C layer handles platform differences
+	C.keyToggle(keyCode, C.bool(down), flags)
+
+	MilliSleep(KeySleep)
+	return nil
 }
 
-// KeyPress press key string
-func KeyPress(key string, args ...interface{}) error {
-	err := KeyDown(key, args...)
+// KeyToggleWithPID toggles a key on a specific process.
+//
+// Examples:
+//
+//	robotgo.KeyToggleWithPID("a", true, pid, robotgo.ModCtrl)
+func KeyToggleWithPID(key string, down bool, pid int, modifiers ...Modifier) error {
+	// Handle uppercase letters
+	if len(key) == 1 && unicode.IsUpper([]rune(key)[0]) {
+		modifiers = append(modifiers, ModShift)
+		key = strings.ToLower(key)
+	}
+
+	// Handle special characters
+	if _, ok := Special[key]; ok {
+		key = Special[key]
+		hasShift := false
+		for _, m := range modifiers {
+			if m == ModShift {
+				hasShift = true
+				break
+			}
+		}
+		if !hasShift {
+			modifiers = append(modifiers, ModShift)
+		}
+	}
+
+	keyCode, err := checkKeyCodes(key)
+	if err != nil {
+		return err
+	}
+
+	flags := modifiersToFlags(modifiers)
+
+	// PID-specific operation
+	C.keyTogglePid(keyCode, C.bool(down), flags, C.uintptr(pid))
+
+	MilliSleep(KeySleep)
+	return nil
+}
+
+// KeyPress press and release a key with random delay (more human-like)
+func KeyPress(key string, modifiers ...Modifier) error {
+	err := KeyDown(key, modifiers...)
 	if err != nil {
 		return err
 	}
 
 	MilliSleep(1 + rand.Intn(3))
-	return KeyUp(key, args...)
+	return KeyUp(key, modifiers...)
 }
 
 // KeyDown press down a key
-func KeyDown(key string, args ...interface{}) error {
-	return KeyToggle(key, args...)
+func KeyDown(key string, modifiers ...Modifier) error {
+	return KeyToggle(key, true, modifiers...)
 }
 
-// KeyUp press up a key
-func KeyUp(key string, args ...interface{}) error {
-	arr := []interface{}{"up"}
-	arr = append(arr, args...)
-	return KeyToggle(key, arr...)
+// KeyUp release a key
+func KeyUp(key string, modifiers ...Modifier) error {
+	return KeyToggle(key, false, modifiers...)
 }
 
 // ReadAll read string from clipboard
@@ -746,10 +821,10 @@ func Paste(str string) error {
 // CmdV tap key command + v or control + v
 func CmdV() error {
 	if runtime.GOOS == "darwin" {
-		return KeyTap("v", "command")
+		return KeyTap("v", ModCmd)
 	}
 
-	return KeyTap("v", "control")
+	return KeyTap("v", ModCtrl)
 }
 
 // TypeStrDelay type string width delay
