@@ -13,6 +13,7 @@ require (
 	github.com/vcaesar/keycode v0.10.1
 	github.com/vcaesar/screenshot v0.11.1
 	github.com/vcaesar/tt v0.20.1
+	golang.design/x/clipboard v0.7.0
 )
 
 require (
@@ -29,8 +30,10 @@ require (
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/exp v0.0.0-20251125195548-87e1e737ad39 // indirect
-	golang.org/x/image v0.33.0 // indirect
-	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/exp/shiny v0.0.0-20251219203646-944ab1f22d93 // indirect
+	golang.org/x/image v0.34.0 // indirect
+	golang.org/x/mobile v0.0.0-20251126181937-5c265dc024c4 // indirect
+	golang.org/x/sys v0.39.0 // indirect
 )
 
 // replace golang.org/x/sys => github.com/golang/sys v0.0.0-20190109145017-48ac38b7c8cb
