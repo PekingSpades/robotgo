@@ -52,8 +52,10 @@ import "C"
 
 import (
 	"errors"
+	"fmt"
 	"image"
 	"runtime"
+	"syscall"
 	"time"
 	"unsafe"
 
@@ -505,6 +507,24 @@ func CheckMouse(btn string) C.MMMouseButton {
 	return C.LEFT_BUTTON
 }
 
+// MouseButtonString converts a C.MMMouseButton to a readable name.
+func MouseButtonString(btn C.MMMouseButton) string {
+	m1 := map[C.MMMouseButton]string{
+		C.LEFT_BUTTON:   "left",
+		C.CENTER_BUTTON: "center",
+		C.RIGHT_BUTTON:  "right",
+		C.WheelDown:     "wheelDown",
+		C.WheelUp:       "wheelUp",
+		C.WheelLeft:     "wheelLeft",
+		C.WheelRight:    "wheelRight",
+	}
+	if v, ok := m1[btn]; ok {
+		return v
+	}
+
+	return fmt.Sprintf("button%d", btn)
+}
+
 // MoveScale calculate the os scale factor x, y
 func MoveScale(x, y int, displayId ...int) (int, int) {
 	if Scale || runtime.GOOS == "windows" {
@@ -663,12 +683,113 @@ func Click(args ...interface{}) {
 	}
 
 	if !double {
-		C.clickMouse(button)
+		C.multiClickErr(button, 1)
 	} else {
-		C.doubleClick(button)
+		C.multiClickErr(button, 2)
 	}
 
 	MilliSleep(MouseSleep)
+}
+
+// ClickE click the mouse button and return error
+//
+// robotgo.ClickE(button string, double bool)
+//
+// Examples:
+//
+//	err := robotgo.ClickE() // default is left button
+//	err := robotgo.ClickE("right")
+func ClickE(args ...interface{}) error {
+	var (
+		button C.MMMouseButton = C.LEFT_BUTTON
+		double bool
+	)
+
+	if len(args) > 0 {
+		btn, ok := args[0].(string)
+		if !ok {
+			return errors.New("first argument must be a button string")
+		}
+		button = CheckMouse(btn)
+	}
+
+	if len(args) > 1 {
+		dbl, ok := args[1].(bool)
+		if !ok {
+			return errors.New("second argument must be a bool indicating double click")
+		}
+		double = dbl
+	}
+
+	defer MilliSleep(MouseSleep)
+
+	clickCount := 1
+	if double {
+		clickCount = 2
+	}
+
+	if code := C.multiClickErr(button, C.int(clickCount)); code != 0 {
+		return formatClickError(int(code), button, clickCount)
+	}
+
+	return nil
+}
+
+func formatClickError(code int, button C.MMMouseButton, clickCount int) error {
+	btnName := MouseButtonString(button)
+	detail := ""
+
+	switch runtime.GOOS {
+	case "windows":
+		if code != 0 {
+			detail = syscall.Errno(code).Error()
+		}
+	case "darwin":
+		cgErrors := map[int]string{
+			0:    "kCGErrorSuccess",
+			1000: "kCGErrorFailure",
+			1001: "kCGErrorIllegalArgument",
+			1002: "kCGErrorInvalidConnection",
+			1003: "kCGErrorInvalidContext",
+			1004: "kCGErrorCannotComplete",
+			1005: "kCGErrorNotImplemented",
+			1006: "kCGErrorRangeCheck",
+			1007: "kCGErrorTypeCheck",
+			1008: "kCGErrorNoCurrentPoint",
+			1010: "kCGErrorInvalidOperation",
+		}
+		if v, ok := cgErrors[code]; ok {
+			detail = v
+		}
+	default:
+		if code == 1 {
+			detail = "XTestFakeButtonEvent returned false"
+		}
+	}
+
+	if detail != "" {
+		return fmt.Errorf("click failed (%s, count=%d): %s (code=%d)", btnName, clickCount, detail, code)
+	}
+
+	return fmt.Errorf("click failed (%s, count=%d), code=%d", btnName, clickCount, code)
+}
+
+// MultiClickE performs multiple clicks and returns error
+//
+// robotgo.MultiClickE(button string, clickCount int)
+func MultiClickE(button string, clickCount int) error {
+	if clickCount < 1 {
+		return nil
+	}
+
+	btn := CheckMouse(button)
+	defer MilliSleep(MouseSleep)
+
+	if code := C.multiClickErr(btn, C.int(clickCount)); code != 0 {
+		return formatClickError(int(code), btn, clickCount)
+	}
+
+	return nil
 }
 
 // MoveClick move and click the mouse
@@ -713,7 +834,7 @@ func Toggle(key ...interface{}) error {
 	if len(key) > 1 && key[1].(string) == "up" {
 		down = false
 	}
-	C.toggleMouse(C.bool(down), button)
+	C.toggleMouseErr(C.bool(down), button)
 	if len(key) > 2 {
 		MilliSleep(MouseSleep)
 	}

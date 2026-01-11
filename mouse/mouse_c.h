@@ -156,20 +156,29 @@ MMPointInt32 location() {
 }
 
 /* Press down a button, or release it. */
-void toggleMouse(bool down, MMMouseButton button) {
+int toggleMouseErr(bool down, MMMouseButton button) {
 	#if defined(IS_MACOSX)
 		const CGPoint currentPos = CGPointFromMMPointInt32(location());
 		const CGEventType mouseType = MMMouseToCGEventType(down, button);
 		CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
 		CGEventRef event = CGEventCreateMouseEvent(source, mouseType, currentPos, (CGMouseButton)button);
 
+		if (event == NULL) {
+			CFRelease(source);
+			return (int)kCGErrorCannotComplete;
+		}
+
 		CGEventPost(kCGHIDEventTap, event);
 		CFRelease(event);
 		CFRelease(source);
+
+		return 0;
 	#elif defined(USE_X11)
 		Display *display = XGetMainDisplay();
-		XTestFakeButtonEvent(display, button, down ? True : False, CurrentTime);
+		Status status = XTestFakeButtonEvent(display, button, down ? True : False, CurrentTime);
 		XSync(display, false);
+
+		return status ? 0 : 1;
 	#elif defined(IS_WINDOWS)
 		// mouse_event(MMMouseToMEventF(down, button), 0, 0, 0, 0);
 		INPUT mouseInput;
@@ -181,29 +190,31 @@ void toggleMouse(bool down, MMMouseButton button) {
 		mouseInput.mi.time = 0;
 		mouseInput.mi.dwExtraInfo = 0;
 		mouseInput.mi.mouseData = 0;
-		SendInput(1, &mouseInput, sizeof(mouseInput));
+		UINT sent = SendInput(1, &mouseInput, sizeof(mouseInput));
+		return sent == 1 ? 0 : (int)GetLastError();
 	#endif
 }
 
-void clickMouse(MMMouseButton button){
-	toggleMouse(true, button);
-	microsleep(5.0);
-	toggleMouse(false, button);
-}
+/* Multi-click function supporting any click count (1=single, 2=double, 3=triple, etc.) */
+int multiClickErr(MMMouseButton button, int clickCount){
+	if (clickCount < 1) {
+		return 0;
+	}
 
-/* Special function for sending double clicks, needed for MacOS. */
-void doubleClick(MMMouseButton button){
 	#if defined(IS_MACOSX)
-		/* Double click for Mac. */
 		const CGPoint currentPos = CGPointFromMMPointInt32(location());
 		const CGEventType mouseTypeDown = MMMouseToCGEventType(true, button);
 		const CGEventType mouseTypeUP = MMMouseToCGEventType(false, button);
 
 		CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
-		CGEventRef event = CGEventCreateMouseEvent(source, mouseTypeDown, currentPos, kCGMouseButtonLeft);
+		CGEventRef event = CGEventCreateMouseEvent(source, mouseTypeDown, currentPos, (CGMouseButton)button);
 
-		/* Set event to double click. */
-		CGEventSetIntegerValueField(event, kCGMouseEventClickState, 2);
+		if (event == NULL) {
+			CFRelease(source);
+			return (int)kCGErrorCannotComplete;
+		}
+
+		CGEventSetIntegerValueField(event, kCGMouseEventClickState, clickCount);
 		CGEventPost(kCGHIDEventTap, event);
 
 		CGEventSetType(event, mouseTypeUP);
@@ -211,11 +222,25 @@ void doubleClick(MMMouseButton button){
 
 		CFRelease(event);
 		CFRelease(source);
+
+		return 0;
 	#else
-		/* Double click for everything else. */
-		clickMouse(button);
-		microsleep(200);
-		clickMouse(button);
+		int i;
+		for (i = 0; i < clickCount; i++) {
+			int err = toggleMouseErr(true, button);
+			if (err != 0) {
+				return err;
+			}
+			microsleep(5.0);
+			err = toggleMouseErr(false, button);
+			if (err != 0) {
+				return err;
+			}
+			if (i < clickCount - 1) {
+				microsleep(200);
+			}
+		}
+		return 0;
 	#endif
 }
 
