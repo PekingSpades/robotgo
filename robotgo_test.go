@@ -35,9 +35,9 @@ func TestSize(t *testing.T) {
 	tt.NotZero(t, x)
 	tt.NotZero(t, y)
 
-	x, y = GetScaleSize()
-	tt.NotZero(t, x)
-	tt.NotZero(t, y)
+	rect := GetScreenRect()
+	tt.NotZero(t, rect.W)
+	tt.NotZero(t, rect.H)
 }
 
 func TestMoveMouse(t *testing.T) {

@@ -39,12 +39,18 @@ func TestGetScreenSize(t *testing.T) {
 	fmt.Println("Get location: ", x, y)
 }
 
-func TestGetSysScale(t *testing.T) {
-	s := robotgo.SysScale()
-	log.Println("SysScale: ", s)
+func TestGetDisplayScale(t *testing.T) {
+	display := robotgo.MainDisplay()
+	s := display.Scale()
+	log.Println("MainDisplay Scale: ", s)
 
-	f := robotgo.ScaleF()
-	log.Println("scale: ", f)
+	count := robotgo.DisplayCount()
+	for i := 0; i < count; i++ {
+		d := robotgo.DisplayAt(i)
+		if d != nil {
+			log.Printf("Display %d Scale: %f\n", i, d.Scale())
+		}
+	}
 }
 
 func TestGetTitle(t *testing.T) {
