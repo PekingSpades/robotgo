@@ -1,3 +1,6 @@
+#ifndef XDISPLAY_C_H
+#define XDISPLAY_C_H
+
 #include <stdio.h> /* For fputs() */
 #include <stdlib.h> /* For atexit() */
 #include <string.h> /* For strdup() */
@@ -56,3 +59,5 @@ static void setXDisplay(char *name) {
 static char *getXDisplay(void) {
 	return displayName;
 }
+
+#endif /* XDISPLAY_C_H */

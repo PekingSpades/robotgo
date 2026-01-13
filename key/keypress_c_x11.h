@@ -11,16 +11,12 @@
 
 #include "../base/deadbeef_rand_c.h"
 #include "../base/microsleep.h"
+#include "../base/xdisplay_c.h"
 #include "keypress.h"
 #include "keycode_c.h"
 
 #include <ctype.h> /* For isupper() */
 #include <X11/extensions/XTest.h>
-
-/*
- * Platform-specific helper functions
- */
-Display *XGetMainDisplay(void);
 
 /*
  * keyTap - Atomic key tap (press + release) with modifiers

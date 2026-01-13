@@ -12,6 +12,7 @@
 #include "mouse.h"
 #include "../base/deadbeef_rand.h"
 #include "../base/microsleep.h"
+#include "../base/xdisplay_c.h"
 
 #include <math.h> /* For floor() */
 #include <X11/Xlib.h>

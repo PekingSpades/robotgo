@@ -2,7 +2,7 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xresource.h>
-// #include "../base/xdisplay_c.h"
+#include "../base/xdisplay_c.h"
 
 intptr scaleX();
 
