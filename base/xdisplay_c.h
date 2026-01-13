@@ -1,5 +1,6 @@
 #include <stdio.h> /* For fputs() */
 #include <stdlib.h> /* For atexit() */
+#include <string.h> /* For strdup() */
 #include <X11/Xlib.h>
 
 static Display *mainDisplay = NULL;
@@ -8,14 +9,14 @@ static int registered = 0;
 static char *displayName = NULL;
 static int hasDisplayNameChanged = 0;
 
-void XCloseMainDisplay(void) {
+static void XCloseMainDisplay(void) {
 	if (mainDisplay != NULL) {
 		XCloseDisplay(mainDisplay);
 		mainDisplay = NULL;
 	}
 }
 
-Display *XGetMainDisplay(void) {
+static Display *XGetMainDisplay(void) {
 	/* Close the display if displayName has changed */
 	if (hasDisplayNameChanged) {
 		XCloseMainDisplay();
@@ -47,11 +48,11 @@ Display *XGetMainDisplay(void) {
 	return mainDisplay;
 }
 
-void setXDisplay(char *name) {
+static void setXDisplay(char *name) {
 	displayName = strdup(name);
 	hasDisplayNameChanged = 1;
 }
 
-char *getXDisplay(void) {
+static char *getXDisplay(void) {
 	return displayName;
 }
