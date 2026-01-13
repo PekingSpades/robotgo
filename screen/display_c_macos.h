@@ -49,22 +49,26 @@ static DisplayInfoC getDisplayInfoById(CGDirectDisplayID displayID, int32_t inde
     info.x = (int32_t)bounds.origin.x;
     info.y = (int32_t)bounds.origin.y;
 
-    // Size uses physical pixel resolution
-    info.w = (int32_t)CGDisplayPixelsWide(displayID);
-    info.h = (int32_t)CGDisplayPixelsHigh(displayID);
-
-    // Get scale factor
+    // Get display mode for physical pixel size and scale factor
+    // Note: CGDisplayPixelsWide/High returns points (not pixels) despite its name
     CGDisplayModeRef mode = CGDisplayCopyDisplayMode(displayID);
     if (mode != NULL) {
-        size_t pixelWidth = CGDisplayModeGetPixelWidth(mode);
+        // Physical pixel resolution from display mode
+        info.w = (int32_t)CGDisplayModeGetPixelWidth(mode);
+        info.h = (int32_t)CGDisplayModeGetPixelHeight(mode);
+
+        // Calculate scale factor (physical pixels / logical points)
         size_t virtualWidth = CGDisplayModeGetWidth(mode);
         if (virtualWidth > 0) {
-            info.scale = (double)pixelWidth / (double)virtualWidth;
+            info.scale = (double)info.w / (double)virtualWidth;
         } else {
             info.scale = 1.0;
         }
         CGDisplayModeRelease(mode);
     } else {
+        // Fallback: CGDisplayPixelsWide/High returns points (logical), not physical pixels
+        info.w = (int32_t)CGDisplayPixelsWide(displayID);
+        info.h = (int32_t)CGDisplayPixelsHigh(displayID);
         info.scale = 1.0;
     }
 
