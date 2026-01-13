@@ -9,6 +9,8 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#include "../base/os.h"
+
 #if defined(IS_WINDOWS)
 	#include "keypress_c_windows.h"
 #elif defined(USE_X11)
