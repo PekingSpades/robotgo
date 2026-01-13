@@ -259,121 +259,24 @@ func GetHWNDByPid(pid int) int {
 	return int(C.get_hwnd_by_pid(C.uintptr(pid)))
 }
 
-// SysScale get the sys scale
-func SysScale(displayId ...int) float64 {
-	display := displayIdx(displayId...)
-	s := C.sys_scale(C.int32_t(display))
-	return float64(s)
-}
-
-// Scaled get the screen scaled return scale size
-func Scaled(x int, displayId ...int) int {
-	f := ScaleF(displayId...)
-	return Scaled0(x, f)
-}
-
-// Scaled0 return int(x * f)
-func Scaled0(x int, f float64) int {
-	return int(float64(x) * f)
-}
-
-// Scaled1 return int(x / f)
-func Scaled1(x int, f float64) int {
-	return int(float64(x) / f)
-}
-
-// GetScreenSize get the screen size
-func GetScreenSize() (int, int) {
-	size := C.getMainDisplaySize()
-	return int(size.w), int(size.h)
-}
-
-// GetScreenRect get the screen rect (x, y, w, h)
-func GetScreenRect(displayId ...int) Rect {
-	display := -1
-	if len(displayId) > 0 {
-		display = displayId[0]
-	}
-
-	rect := C.getScreenRect(C.int32_t(display))
-	x, y, w, h := int(rect.origin.x), int(rect.origin.y),
-		int(rect.size.w), int(rect.size.h)
-
-	if runtime.GOOS == "windows" {
-		// f := ScaleF(displayId...)
-		f := ScaleF()
-		x, y, w, h = Scaled0(x, f), Scaled0(y, f), Scaled0(w, f), Scaled0(h, f)
-	}
-	return Rect{
-		Point{X: x, Y: y},
-		Size{W: w, H: h},
-	}
-}
-
-// GetScaleSize get the screen scale size
-func GetScaleSize(displayId ...int) (int, int) {
-	x, y := GetScreenSize()
-	f := ScaleF(displayId...)
-	return int(float64(x) * f), int(float64(y) * f)
-}
-
-// CaptureScreen capture the screen return bitmap(c struct),
-// use `defer robotgo.FreeBitmap(bitmap)` to free the bitmap
-//
-// Deprecated: Use Display.Capture() instead for physical pixel coordinates.
-//
-// robotgo.CaptureScreen(x, y, w, h int)
-func CaptureScreen(args ...int) CBitmap {
-	var x, y, w, h C.int32_t
-	displayId := -1
-
-	if len(args) > 4 {
-		displayId = args[4]
-	}
-
-	if len(args) > 3 {
-		x = C.int32_t(args[0])
-		y = C.int32_t(args[1])
-		w = C.int32_t(args[2])
-		h = C.int32_t(args[3])
-	} else {
-		// Get the main screen rect.
-		rect := GetScreenRect(displayId)
-		if runtime.GOOS == "windows" {
-			x = C.int32_t(rect.X)
-			y = C.int32_t(rect.Y)
-		}
-
-		w = C.int32_t(rect.W)
-		h = C.int32_t(rect.H)
-	}
-
-	isPid := 0
-	if NotPid || len(args) > 5 {
-		isPid = 1
-	}
-
-	bit := C.capture_screen(x, y, w, h, C.int32_t(displayId), C.int8_t(isPid))
-	return CBitmap(bit)
-}
-
-// CaptureGo capture the screen and return bitmap(go struct)
-func CaptureGo(args ...int) Bitmap {
-	bit := CaptureScreen(args...)
-	defer FreeBitmap(bit)
-
-	return ToBitmap(bit)
-}
-
 // CaptureImg capture the screen and return image.Image, error
+//
+// Deprecated: Use Display.CaptureImage() instead for physical pixel coordinates.
 func CaptureImg(args ...int) (image.Image, error) {
-	bit := CaptureScreen(args...)
-	if bit == nil {
-		return nil, errors.New("Capture image not found.")
+	// Use the new Display API internally
+	display, err := MainDisplay()
+	if err != nil {
+		return nil, err
 	}
-	defer FreeBitmap(bit)
 
-	return ToImage(bit), nil
+	var x, y, w, h int
+	if len(args) > 3 {
+		x, y, w, h = args[0], args[1], args[2], args[3]
+	} else {
+		x, y, w, h = 0, 0, display.Width, display.Height
+	}
+
+	return display.CaptureImage(x, y, w, h)
 }
 
 // FreeBitmap free and dealloc the C bitmap

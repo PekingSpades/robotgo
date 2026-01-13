@@ -14,45 +14,40 @@ package robotgo
 import (
 	"image"
 
-	// "github.com/kbinani/screenshot"
 	"github.com/vcaesar/screenshot"
 )
-
-// GetDisplayBounds gets the display screen bounds
-func GetDisplayBounds(i int) (x, y, w, h int) {
-	bs := screenshot.GetDisplayBounds(i)
-	return bs.Min.X, bs.Min.Y, bs.Dx(), bs.Dy()
-}
-
-// GetDisplayRect gets the display rect
-func GetDisplayRect(i int) Rect {
-	x, y, w, h := GetDisplayBounds(i)
-	return Rect{
-		Point{X: x, Y: y},
-		Size{W: w, H: h}}
-}
 
 // Capture capture the screenshot, use the CaptureImg default
 //
 // Deprecated: Use Display.CaptureRGBA() instead for physical pixel coordinates.
 func Capture(args ...int) (*image.RGBA, error) {
-	displayId := 0
-
-	if len(args) > 4 {
-		displayId = args[4]
+	display, err := MainDisplay()
+	if err != nil {
+		return nil, err
 	}
 
 	var x, y, w, h int
 	if len(args) > 3 {
 		x, y, w, h = args[0], args[1], args[2], args[3]
 	} else {
-		x, y, w, h = GetDisplayBounds(displayId)
+		x, y, w, h = 0, 0, display.Width, display.Height
 	}
 
-	return screenshot.Capture(x, y, w, h)
+	// Convert physical pixels to points for screenshot library on macOS
+	captureX, captureY, captureW, captureH := x, y, w, h
+	if isMacOSPlatform {
+		captureX = int(float64(x) / display.Scale)
+		captureY = int(float64(y) / display.Scale)
+		captureW = int(float64(w) / display.Scale)
+		captureH = int(float64(h) / display.Scale)
+	}
+
+	return screenshot.Capture(captureX, captureY, captureW, captureH)
 }
 
 // SaveCapture capture screen and save the screenshot to image
+//
+// Deprecated: Use Display.SaveCapture() instead for physical pixel coordinates.
 func SaveCapture(path string, args ...int) error {
 	img, err := CaptureImg(args...)
 	if err != nil {

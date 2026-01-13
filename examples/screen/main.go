@@ -16,31 +16,44 @@ import (
 	"strconv"
 
 	"github.com/go-vgo/robotgo"
-	// "go-vgo/robotgo"
 )
 
 func bitmap() {
-	bit := robotgo.CaptureScreen()
+	// Get main display
+	display, err := robotgo.MainDisplay()
+	if err != nil {
+		fmt.Println("Error getting main display:", err)
+		return
+	}
+
+	// Capture entire screen using Display API
+	bit, err := display.CaptureAll()
+	if err != nil {
+		fmt.Println("Capture error:", err)
+		return
+	}
 	defer robotgo.FreeBitmap(bit)
-	fmt.Println("abitMap...", bit)
+	fmt.Println("bitmap...", robotgo.ToBitmap(bit).Width)
 
-	gbit := robotgo.ToBitmap(bit)
-	fmt.Println("bitmap...", gbit.Width)
+	// Save using Display API
+	err = display.SaveCaptureAll("saveCapture.png")
+	if err != nil {
+		fmt.Println("SaveCapture error:", err)
+	}
 
-	gbitMap := robotgo.CaptureGo()
-	fmt.Println("Go CaptureScreen...", gbitMap.Width)
-	// fmt.Println("...", gbitmap.Width, gbitmap.BytesPerPixel)
-	robotgo.SaveCapture("saveCapture.png", 10, 20, 100, 100)
-
-	img, err := robotgo.CaptureImg()
-	fmt.Println("error: ", err)
-	robotgo.Save(img, "save.png")
+	// Capture region using Display API
+	img, err := display.CaptureImage(0, 0, display.Width, display.Height)
+	if err != nil {
+		fmt.Println("CaptureImage error:", err)
+	} else {
+		robotgo.Save(img, "save.png")
+	}
 
 	// Use the new Display API for multi-monitor capture
 	displays, _ := robotgo.Displays()
-	for i, display := range displays {
-		// Capture using new Display API
-		img1, err := display.CaptureAllImage()
+	for i, d := range displays {
+		// Capture entire display
+		img1, err := d.CaptureAllImage()
 		if err != nil {
 			fmt.Println("Capture error:", err)
 			continue
@@ -50,7 +63,7 @@ func bitmap() {
 		robotgo.SaveJpeg(img1, path1+".jpeg", 50)
 
 		// Capture a region using Display.CaptureImage
-		img2, err := display.CaptureImage(10, 10, 20, 20)
+		img2, err := d.CaptureImage(10, 10, 20, 20)
 		if err != nil {
 			fmt.Println("Capture error:", err)
 			continue
@@ -59,18 +72,33 @@ func bitmap() {
 		robotgo.Save(img2, path2+".png")
 		robotgo.SaveJpeg(img2, path2+".jpeg", 50)
 
-		x, y, w, h := robotgo.GetDisplayBounds(i)
-		img3, err := robotgo.CaptureImg(x, y, w, h)
-		fmt.Println("Capture error: ", err)
+		// Capture using bounds from Display
+		img3, err := d.CaptureAllImage()
+		if err != nil {
+			fmt.Println("Capture error:", err)
+			continue
+		}
 		robotgo.Save(img3, path2+"_1.png")
 	}
 }
 
 func color() {
-	// gets the pixel color at 100, 200.
-	color := robotgo.GetPixelColor(100, 200)
-	fmt.Println("color----", color, "-----------------")
+	// Get main display for pixel color operations
+	display, err := robotgo.MainDisplay()
+	if err != nil {
+		fmt.Println("Error getting display:", err)
+		return
+	}
 
+	// gets the pixel color at 100, 200 using Display API
+	color, err := display.GetPixelColor(100, 200)
+	if err != nil {
+		fmt.Println("GetPixelColor error:", err)
+	} else {
+		fmt.Println("color----", color, "-----------------")
+	}
+
+	// Use global GetPxColor (still available for virtual screen coords)
 	clo := robotgo.GetPxColor(100, 200)
 	fmt.Println("color...", clo)
 	clostr := robotgo.PadHex(clo)
@@ -86,7 +114,7 @@ func color() {
 	fmt.Println("HexToRgb...", hexh)
 
 	// gets the pixel color at 10, 20.
-	color2 := robotgo.GetPixelColor(10, 20)
+	color2, _ := display.GetPixelColor(10, 20)
 	fmt.Println("color---", color2)
 }
 
@@ -97,15 +125,21 @@ func screen() {
 
 	bitmap()
 
-	// gets the screen width and height
-	sx, sy := robotgo.GetScreenSize()
-	fmt.Println("get screen size: ", sx, sy)
-	for i := 0; i < robotgo.DisplaysNum(); i++ {
-		s1 := robotgo.ScaleF(i)
-		fmt.Println("ScaleF: ", s1)
+	// Use the new Display API for screen info
+	display, err := robotgo.MainDisplay()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
 	}
-	sx, sy = robotgo.GetScaleSize()
-	fmt.Println("get screen scale size: ", sx, sy)
+	fmt.Println("Main display size:", display.Width, "x", display.Height)
+	fmt.Println("Main display scale:", display.Scale)
+
+	// List all displays
+	displays, _ := robotgo.Displays()
+	for i, d := range displays {
+		fmt.Printf("Display %d: %dx%d at (%d,%d) scale=%.2f\n",
+			i, d.Width, d.Height, d.X, d.Y, d.Scale)
+	}
 
 	color()
 }

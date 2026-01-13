@@ -37,10 +37,10 @@ func TestSize(t *testing.T) {
 	tt.NotZero(t, display.Width)
 	tt.NotZero(t, display.Height)
 
-	// Test deprecated function still works
-	x, y := GetScreenSize()
-	tt.NotZero(t, x)
-	tt.NotZero(t, y)
+	// Test displays list
+	displays, err := Displays()
+	tt.Nil(t, err)
+	tt.NotZero(t, len(displays))
 }
 
 func TestMoveMouse(t *testing.T) {
@@ -186,15 +186,20 @@ func TestKeyCode(t *testing.T) {
 }
 
 func TestImage(t *testing.T) {
-	bit := CaptureScreen()
+	// Test the new Display capture API
+	display, err := MainDisplay()
+	tt.Nil(t, err)
+
+	bit, err := display.Capture(0, 0, 100, 100)
+	tt.Nil(t, err)
 	defer FreeBitmap(bit)
 	tt.NotNil(t, bit)
 
 	img := ToImage(bit)
-	err := SavePng(img, "robot_test.png")
+	err = SavePng(img, "robot_test.png")
 	tt.Nil(t, err)
 
-	img1, err := CaptureImg(10, 10, 20, 20)
+	img1, err := display.CaptureImage(10, 10, 20, 20)
 	tt.Nil(t, err)
 	e := Save(img1, "robot_img.jpeg", 50)
 	tt.Nil(t, e)

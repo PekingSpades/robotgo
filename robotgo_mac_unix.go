@@ -14,11 +14,5 @@
 
 package robotgo
 
-// ScaleF get the system scale val
-func ScaleF(displayId ...int) float64 {
-	f := SysScale(displayId...)
-	if f == 0.0 {
-		f = 1.0
-	}
-	return f
-}
+// This file previously contained ScaleF() which has been removed.
+// Use Display.Scale instead for scale factor information.

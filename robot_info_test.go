@@ -13,7 +13,6 @@ package robotgo_test
 
 import (
 	"fmt"
-	"log"
 	"runtime"
 	"testing"
 
@@ -28,29 +27,22 @@ func TestGetVer(t *testing.T) {
 	tt.Expect(t, robotgo.Version, ver)
 }
 
-func TestGetScreenSize(t *testing.T) {
-	x, y := robotgo.GetScreenSize()
-	log.Println("Get screen size: ", x, y)
-
-	rect := robotgo.GetScreenRect()
-	fmt.Println("Get screen rect: ", rect)
-
-	x, y, _ = robotgo.Location()
-	fmt.Println("Get location: ", x, y)
-
+func TestDisplay(t *testing.T) {
 	// Test the new Display API
 	display, err := robotgo.MainDisplay()
-	if err == nil {
-		fmt.Println("Main display: ", display.Width, "x", display.Height, "scale:", display.Scale)
+	tt.Nil(t, err)
+	fmt.Println("Main display: ", display.Width, "x", display.Height, "scale:", display.Scale)
+
+	// Test all displays
+	displays, err := robotgo.Displays()
+	tt.Nil(t, err)
+	for i, d := range displays {
+		fmt.Printf("Display %d: %dx%d at (%d,%d) scale=%.2f\n",
+			i, d.Width, d.Height, d.X, d.Y, d.Scale)
 	}
-}
 
-func TestGetSysScale(t *testing.T) {
-	s := robotgo.SysScale()
-	log.Println("SysScale: ", s)
-
-	f := robotgo.ScaleF()
-	log.Println("scale: ", f)
+	x, y, _ := robotgo.Location()
+	fmt.Println("Get location: ", x, y)
 }
 
 func TestGetTitle(t *testing.T) {
