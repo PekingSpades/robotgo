@@ -1,3 +1,5 @@
+#include "../base/os.h"
+
 #if defined(IS_MACOSX)
 	#include "keycode_c_macos.h"
 #elif defined(IS_WINDOWS)
