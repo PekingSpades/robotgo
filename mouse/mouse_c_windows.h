@@ -35,7 +35,7 @@ DWORD MMMouseToMEventF(bool down, MMMouseButton button) {
 
 /* Move the mouse to a specific point. */
 void moveMouse(MMPointInt32 point){
-	SetCursorPos(point.x, point.y);
+	SetPhysicalCursorPos(point.x, point.y);
 }
 
 void dragMouse(MMPointInt32 point, const MMMouseButton button){
@@ -44,7 +44,7 @@ void dragMouse(MMPointInt32 point, const MMMouseButton button){
 
 MMPointInt32 location() {
 	POINT point;
-	GetCursorPos(&point);
+	GetPhysicalCursorPos(&point);
 	return MMPointInt32FromPOINT(point);
 }
 

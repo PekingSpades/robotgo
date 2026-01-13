@@ -18,15 +18,11 @@ package robotgo
 #cgo linux CFLAGS: -I/usr/src
 #cgo linux LDFLAGS: -L/usr/src -lm -lX11 -lXtst -lXinerama
 
-#include "screen/goScreen.h"
 #include "screen/display_c.h"
-#include "mouse/mouse_c.h"
 */
 import "C"
 
-import (
-	"image"
-)
+import "image"
 
 // MainDisplay returns the main display.
 func MainDisplay() *Display {
@@ -100,45 +96,45 @@ func DisplayCount() int {
 	return int(C.getDisplayCount())
 }
 
+// ToAbsolute converts coordinates relative to this display to absolute coordinates.
+// On Linux, both input and output are physical pixel coordinates.
+func (d *Display) ToAbsolute(x, y int) (absX, absY int) {
+	return d.bounds.X + x, d.bounds.Y + y
+}
+
+// ToRelative converts absolute coordinates to coordinates relative to this display.
+// Returns (0, 0, false) if the coordinate is not within this display.
+// On Linux, both input and output are physical pixel coordinates.
+func (d *Display) ToRelative(absX, absY int) (x, y int, ok bool) {
+	if !d.Contains(absX, absY) {
+		return 0, 0, false
+	}
+	return absX - d.bounds.X, absY - d.bounds.Y, true
+}
+
+// Contains checks if the specified absolute coordinate is within this display.
+// On Linux, coordinates are physical pixels.
+func (d *Display) Contains(absX, absY int) bool {
+	return absX >= d.bounds.X && absX < d.bounds.X+d.bounds.W &&
+		absY >= d.bounds.Y && absY < d.bounds.Y+d.bounds.H
+}
+
 // Move moves the mouse to the specified coordinates relative to this display.
-// On Linux, coordinates are in physical pixels.
+// Coordinates are in physical pixels.
 func (d *Display) Move(x, y int) {
 	absX, absY := d.ToAbsolute(x, y)
-	cx := C.int32_t(absX)
-	cy := C.int32_t(absY)
-	C.moveMouse(C.MMPointInt32Make(cx, cy))
-	MilliSleep(MouseSleep)
+	Move(absX, absY)
 }
 
 // MoveSmooth smoothly moves the mouse to the specified coordinates relative to this display.
+// Coordinates are in physical pixels.
 func (d *Display) MoveSmooth(x, y int, args ...interface{}) bool {
 	absX, absY := d.ToAbsolute(x, y)
-
-	var (
-		mouseDelay = 1
-		low        C.double
-		high       C.double
-	)
-
-	if len(args) > 2 {
-		mouseDelay = args[2].(int)
-	}
-
-	if len(args) > 1 {
-		low = C.double(args[0].(float64))
-		high = C.double(args[1].(float64))
-	} else {
-		low = 1.0
-		high = 3.0
-	}
-
-	cbool := C.smoothlyMoveMouse(C.MMPointInt32Make(C.int32_t(absX), C.int32_t(absY)), low, high)
-	MilliSleep(MouseSleep + mouseDelay)
-
-	return bool(cbool)
+	return MoveSmooth(absX, absY, args...)
 }
 
 // Drag drags the mouse from one position to another on this display.
+// Coordinates are in physical pixels relative to this display.
 func (d *Display) Drag(fromX, fromY, toX, toY int, button string) {
 	d.Move(fromX, fromY)
 	Toggle(button)
@@ -148,6 +144,7 @@ func (d *Display) Drag(fromX, fromY, toX, toY int, button string) {
 }
 
 // DragTo drags the mouse from the current position to the specified position on this display.
+// Coordinates are in physical pixels relative to this display.
 func (d *Display) DragTo(x, y int, button string) {
 	Toggle(button)
 	MilliSleep(50)
@@ -161,29 +158,15 @@ func (d *Display) Capture() (*image.RGBA, error) {
 }
 
 // CaptureRect captures a rectangular region of this display.
-// Coordinates are relative to this display.
+// Coordinates and size are in physical pixels relative to this display.
 func (d *Display) CaptureRect(x, y, w, h int) (*image.RGBA, error) {
 	absX, absY := d.ToAbsolute(x, y)
-
-	bit := C.capture_screen(
-		C.int32_t(absX),
-		C.int32_t(absY),
-		C.int32_t(w),
-		C.int32_t(h),
-		C.int32_t(-1),
-		C.int8_t(0),
-	)
-
-	if bit == nil {
-		return nil, ErrCaptureScreen
-	}
-	defer FreeBitmap(CBitmap(bit))
-
-	return ToRGBA(CBitmap(bit)), nil
+	return Capture(absX, absY, w, h)
 }
 
 // GetPixelColor gets the pixel color at the specified coordinates relative to this display.
 // Returns the color as a hex string "RRGGBB".
+// Coordinates are in physical pixels.
 func (d *Display) GetPixelColor(x, y int) string {
 	absX, absY := d.ToAbsolute(x, y)
 	return GetPixelColor(absX, absY)
@@ -191,6 +174,7 @@ func (d *Display) GetPixelColor(x, y int) string {
 
 // MouseLocation gets the mouse location relative to this display.
 // Returns (-1, -1, false) if the mouse is not on this display.
+// Coordinates are in physical pixels.
 func (d *Display) MouseLocation() (x, y int, ok bool) {
 	absX, absY := Location()
 	return d.ToRelative(absX, absY)

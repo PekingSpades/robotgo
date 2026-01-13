@@ -20,15 +20,11 @@ package robotgo
 #cgo darwin LDFLAGS: -framework Carbon -framework OpenGL
 #cgo darwin LDFLAGS: -weak_framework ScreenCaptureKit
 
-#include "screen/goScreen.h"
 #include "screen/display_c.h"
-#include "mouse/mouse_c.h"
 */
 import "C"
 
-import (
-	"image"
-)
+import "image"
 
 // MainDisplay returns the main display.
 func MainDisplay() *Display {
@@ -102,45 +98,86 @@ func DisplayCount() int {
 	return int(C.getDisplayCount())
 }
 
-// Move moves the mouse to the specified coordinates relative to this display.
-// On macOS, coordinates are in virtual (scaled) points.
-func (d *Display) Move(x, y int) {
-	absX, absY := d.ToAbsolute(x, y)
-	cx := C.int32_t(absX)
-	cy := C.int32_t(absY)
-	C.moveMouse(C.MMPointInt32Make(cx, cy))
-	MilliSleep(MouseSleep)
+// virtualWidth returns the virtual (point) width of the display.
+func (d *Display) virtualWidth() int {
+	if d.scale > 0 {
+		return int(float64(d.bounds.W) / d.scale)
+	}
+	return d.bounds.W
 }
 
-// MoveSmooth smoothly moves the mouse to the specified coordinates relative to this display.
-func (d *Display) MoveSmooth(x, y int, args ...interface{}) bool {
-	absX, absY := d.ToAbsolute(x, y)
-
-	var (
-		mouseDelay = 1
-		low        C.double
-		high       C.double
-	)
-
-	if len(args) > 2 {
-		mouseDelay = args[2].(int)
+// virtualHeight returns the virtual (point) height of the display.
+func (d *Display) virtualHeight() int {
+	if d.scale > 0 {
+		return int(float64(d.bounds.H) / d.scale)
 	}
+	return d.bounds.H
+}
 
-	if len(args) > 1 {
-		low = C.double(args[0].(float64))
-		high = C.double(args[1].(float64))
+// ToAbsolute converts physical pixel coordinates relative to this display
+// to virtual absolute coordinates (for use with macOS APIs).
+// Input: physical pixel coordinates (0,0 is top-left of this display)
+// Output: virtual absolute coordinates in the virtual desktop
+func (d *Display) ToAbsolute(physX, physY int) (virtAbsX, virtAbsY int) {
+	if d.scale > 0 {
+		// Convert physical to virtual relative, then add virtual origin
+		virtAbsX = d.bounds.X + int(float64(physX)/d.scale)
+		virtAbsY = d.bounds.Y + int(float64(physY)/d.scale)
 	} else {
-		low = 1.0
-		high = 3.0
+		virtAbsX = d.bounds.X + physX
+		virtAbsY = d.bounds.Y + physY
 	}
+	return
+}
 
-	cbool := C.smoothlyMoveMouse(C.MMPointInt32Make(C.int32_t(absX), C.int32_t(absY)), low, high)
-	MilliSleep(MouseSleep + mouseDelay)
+// ToRelative converts virtual absolute coordinates to physical pixel coordinates
+// relative to this display.
+// Input: virtual absolute coordinates from the virtual desktop
+// Output: physical pixel coordinates relative to this display
+// Returns (0, 0, false) if the coordinate is not within this display.
+func (d *Display) ToRelative(virtAbsX, virtAbsY int) (physX, physY int, ok bool) {
+	if !d.Contains(virtAbsX, virtAbsY) {
+		return 0, 0, false
+	}
+	// Calculate virtual relative coordinates
+	virtRelX := virtAbsX - d.bounds.X
+	virtRelY := virtAbsY - d.bounds.Y
+	// Convert to physical coordinates
+	if d.scale > 0 {
+		physX = int(float64(virtRelX) * d.scale)
+		physY = int(float64(virtRelY) * d.scale)
+	} else {
+		physX = virtRelX
+		physY = virtRelY
+	}
+	return physX, physY, true
+}
 
-	return bool(cbool)
+// Contains checks if the specified virtual absolute coordinate is within this display.
+// Input: virtual absolute coordinates
+func (d *Display) Contains(virtAbsX, virtAbsY int) bool {
+	virtW := d.virtualWidth()
+	virtH := d.virtualHeight()
+	return virtAbsX >= d.bounds.X && virtAbsX < d.bounds.X+virtW &&
+		virtAbsY >= d.bounds.Y && virtAbsY < d.bounds.Y+virtH
+}
+
+// Move moves the mouse to the specified physical pixel coordinates relative to this display.
+// The coordinates are converted to virtual coordinates before calling the macOS API.
+func (d *Display) Move(physX, physY int) {
+	virtAbsX, virtAbsY := d.ToAbsolute(physX, physY)
+	Move(virtAbsX, virtAbsY)
+}
+
+// MoveSmooth smoothly moves the mouse to the specified physical pixel coordinates
+// relative to this display.
+func (d *Display) MoveSmooth(physX, physY int, args ...interface{}) bool {
+	virtAbsX, virtAbsY := d.ToAbsolute(physX, physY)
+	return MoveSmooth(virtAbsX, virtAbsY, args...)
 }
 
 // Drag drags the mouse from one position to another on this display.
+// Coordinates are in physical pixels relative to this display.
 func (d *Display) Drag(fromX, fromY, toX, toY int, button string) {
 	d.Move(fromX, fromY)
 	Toggle(button)
@@ -150,10 +187,11 @@ func (d *Display) Drag(fromX, fromY, toX, toY int, button string) {
 }
 
 // DragTo drags the mouse from the current position to the specified position on this display.
-func (d *Display) DragTo(x, y int, button string) {
+// Coordinates are in physical pixels relative to this display.
+func (d *Display) DragTo(physX, physY int, button string) {
 	Toggle(button)
 	MilliSleep(50)
-	d.MoveSmooth(x, y)
+	d.MoveSmooth(physX, physY)
 	Toggle(button, "up")
 }
 
@@ -163,43 +201,36 @@ func (d *Display) Capture() (*image.RGBA, error) {
 }
 
 // CaptureRect captures a rectangular region of this display.
-// Coordinates are relative to this display.
-func (d *Display) CaptureRect(x, y, w, h int) (*image.RGBA, error) {
-	absX, absY := d.ToAbsolute(x, y)
-
-	bit := C.capture_screen(
-		C.int32_t(absX),
-		C.int32_t(absY),
-		C.int32_t(w),
-		C.int32_t(h),
-		C.int32_t(d.id),
-		C.int8_t(0),
-	)
-
-	if bit == nil {
-		return nil, ErrCaptureScreen
+// Coordinates and size are in physical pixels relative to this display.
+func (d *Display) CaptureRect(physX, physY, w, h int) (*image.RGBA, error) {
+	virtAbsX, virtAbsY := d.ToAbsolute(physX, physY)
+	// Convert size from physical to virtual for the capture API
+	virtW := w
+	virtH := h
+	if d.scale > 0 {
+		virtW = int(float64(w) / d.scale)
+		virtH = int(float64(h) / d.scale)
 	}
-	defer FreeBitmap(CBitmap(bit))
-
-	return ToRGBA(CBitmap(bit)), nil
+	return Capture(virtAbsX, virtAbsY, virtW, virtH)
 }
 
-// GetPixelColor gets the pixel color at the specified coordinates relative to this display.
+// GetPixelColor gets the pixel color at the specified physical pixel coordinates
+// relative to this display.
 // Returns the color as a hex string "RRGGBB".
-func (d *Display) GetPixelColor(x, y int) string {
-	absX, absY := d.ToAbsolute(x, y)
-	return GetPixelColor(absX, absY)
+func (d *Display) GetPixelColor(physX, physY int) string {
+	virtAbsX, virtAbsY := d.ToAbsolute(physX, physY)
+	return GetPixelColor(virtAbsX, virtAbsY)
 }
 
-// MouseLocation gets the mouse location relative to this display.
+// MouseLocation gets the mouse location in physical pixels relative to this display.
 // Returns (-1, -1, false) if the mouse is not on this display.
-func (d *Display) MouseLocation() (x, y int, ok bool) {
-	absX, absY := Location()
-	return d.ToRelative(absX, absY)
+func (d *Display) MouseLocation() (physX, physY int, ok bool) {
+	virtAbsX, virtAbsY := Location()
+	return d.ToRelative(virtAbsX, virtAbsY)
 }
 
 // ContainsMouse checks if the mouse is on this display.
 func (d *Display) ContainsMouse() bool {
-	absX, absY := Location()
-	return d.Contains(absX, absY)
+	virtAbsX, virtAbsY := Location()
+	return d.Contains(virtAbsX, virtAbsY)
 }

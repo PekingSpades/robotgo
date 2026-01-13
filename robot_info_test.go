@@ -16,6 +16,7 @@ import (
 	"log"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/go-vgo/robotgo"
 	"github.com/vcaesar/tt"
@@ -53,10 +54,96 @@ func TestGetDisplayScale(t *testing.T) {
 	}
 }
 
+func TestAllDisplaysInfo(t *testing.T) {
+	count := robotgo.DisplayCount()
+	fmt.Printf("Total displays: %d\n", count)
+	fmt.Println("----------------------------------------")
+
+	displays := robotgo.AllDisplays()
+	for _, d := range displays {
+		info := d.Info()
+		fmt.Printf("Display #%d\n", info.Index)
+		fmt.Printf("  ID:       %d\n", info.ID)
+		fmt.Printf("  IsMain:   %v\n", info.IsMain)
+		fmt.Printf("  Position: (%d, %d)\n", info.Bounds.X, info.Bounds.Y)
+		fmt.Printf("  Size:     %d x %d\n", info.Bounds.W, info.Bounds.H)
+		fmt.Printf("  Scale:    %.2f\n", info.ScaleFactor)
+		fmt.Println("----------------------------------------")
+	}
+
+	// Also test MainDisplay
+	main := robotgo.MainDisplay()
+	fmt.Printf("MainDisplay: Index=%d, Size=%dx%d, Scale=%.2f\n",
+		main.Index(), main.Width(), main.Height(), main.Scale())
+}
+
+func TestDisplayMoveCorners(t *testing.T) {
+	displays := robotgo.AllDisplays()
+	fmt.Printf("Testing mouse movement on %d display(s)\n", len(displays))
+
+	for _, d := range displays {
+		info := d.Info()
+		w, h := info.Bounds.W, info.Bounds.H
+		fmt.Printf("\nDisplay #%d (%dx%d) @ (%d,%d):\n", info.Index, w, h, info.Bounds.X, info.Bounds.Y)
+
+		// Define corners and center positions (relative to display)
+		positions := []struct {
+			name string
+			x, y int
+		}{
+			{"top-left", 0, 0},
+			{"top-right", w - 1, 0},
+			{"bottom-left", 0, h - 1},
+			{"bottom-right", w - 1, h - 1},
+			{"center", w / 2, h / 2},
+		}
+
+		for _, pos := range positions {
+			d.Move(pos.x, pos.y)
+			robotgo.MilliSleep(1000)
+			absX, absY := robotgo.Location()
+			relX, relY, _ := d.MouseLocation()
+			fmt.Printf("  %s: target=(%d,%d) abs=(%d,%d) rel=(%d,%d)\n",
+				pos.name, pos.x, pos.y, absX, absY, relX, relY)
+			robotgo.MilliSleep(1000)
+		}
+	}
+
+	fmt.Println("\nDone!")
+}
+
 func TestGetTitle(t *testing.T) {
 	// just exercise the function, it used to crash with a segfault + "Maximum
 	// number of clients reached"
 	for i := 0; i < 128; i++ {
 		robotgo.GetTitle()
+	}
+}
+
+func TestMousePositionMonitor(t *testing.T) {
+	// Print screen info
+	fmt.Println("========== Screen Info ==========")
+	count := robotgo.DisplayCount()
+	fmt.Printf("Total displays: %d\n", count)
+
+	displays := robotgo.AllDisplays()
+	for _, d := range displays {
+		info := d.Info()
+		fmt.Printf("Display #%d: ID=%d, IsMain=%v, Position=(%d,%d), Size=%dx%d, Scale=%.2f\n",
+			info.Index, info.ID, info.IsMain,
+			info.Bounds.X, info.Bounds.Y,
+			info.Bounds.W, info.Bounds.H,
+			info.ScaleFactor)
+	}
+	fmt.Println("=================================")
+
+	// Print mouse position every 1 seconds
+	fmt.Println("\nMonitoring mouse position (every 1 seconds)...")
+	fmt.Println("Press Ctrl+C to stop")
+
+	for i := 0; i < 120; i++ {
+		x, y := robotgo.Location()
+		fmt.Printf("[%s] Mouse position: (%d, %d)\n", time.Now().Format("15:04:05"), x, y)
+		time.Sleep(1 * time.Second)
 	}
 }

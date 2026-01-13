@@ -15,12 +15,44 @@
 #include "../base/types.h"
 #include <windows.h>
 
+// MDT_EFFECTIVE_DPI for GetDpiForMonitor
+#ifndef MDT_EFFECTIVE_DPI
+#define MDT_EFFECTIVE_DPI 0
+#endif
+
+// Function pointer type for GetDpiForMonitor
+typedef HRESULT (WINAPI *GetDpiForMonitorFunc)(HMONITOR, int, UINT*, UINT*);
+
+// Get DPI for a monitor using dynamic loading (Windows 8.1+)
+static double getMonitorScale(HMONITOR hMonitor) {
+    static GetDpiForMonitorFunc pGetDpiForMonitor = NULL;
+    static BOOL initialized = FALSE;
+
+    if (!initialized) {
+        initialized = TRUE;
+        HMODULE hShcore = LoadLibraryW(L"Shcore.dll");
+        if (hShcore) {
+            pGetDpiForMonitor = (GetDpiForMonitorFunc)GetProcAddress(hShcore, "GetDpiForMonitor");
+        }
+    }
+
+    if (pGetDpiForMonitor) {
+        UINT dpiX = 96, dpiY = 96;
+        HRESULT hr = pGetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY);
+        if (SUCCEEDED(hr) && dpiX > 0) {
+            return (double)dpiX / 96.0;
+        }
+    }
+    return 1.0;
+}
+
 // DisplayInfoC contains display information in C struct
 typedef struct {
     uintptr handle;     // HMONITOR handle
     int32_t index;      // Display index
     int8_t  isMain;     // Is main display
     int32_t x, y, w, h; // Physical coordinates and size
+    int32_t vx, vy;     // Virtual (logical) coordinates origin
     double  scale;      // Scale factor (physical/logical)
 } DisplayInfoC;
 
@@ -90,18 +122,27 @@ static BOOL CALLBACK MonitorInfoEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRE
     info->index = ctx->currentIndex;
     info->isMain = (mi.dwFlags & MONITORINFOF_PRIMARY) ? 1 : 0;
 
+    // Always store virtual (logical) coordinates
+    info->vx = lprcMonitor->left;
+    info->vy = lprcMonitor->top;
+
     if (hasPhysical) {
         // Use physical coordinates
         info->x = physRect.left;
         info->y = physRect.top;
         info->w = physRect.right - physRect.left;
         info->h = physRect.bottom - physRect.top;
-        // Calculate scale factor
+
+        // Calculate scale based on DPI awareness mode
         int32_t logicalW = lprcMonitor->right - lprcMonitor->left;
-        if (logicalW > 0) {
+        if (logicalW > 0 && info->w != logicalW) {
+            // Physical and logical sizes differ (DPI unaware mode)
+            // Windows virtualizes coordinates, use ratio to calculate scale
             info->scale = (double)info->w / (double)logicalW;
         } else {
-            info->scale = 1.0;
+            // Physical and logical sizes are same (DPI aware mode)
+            // Use GetDpiForMonitor to get actual scale
+            info->scale = getMonitorScale(hMonitor);
         }
     } else {
         // Fallback: use logical coordinates

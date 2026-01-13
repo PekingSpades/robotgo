@@ -20,7 +20,8 @@ typedef struct {
     uintptr handle;     // CGDirectDisplayID
     int32_t index;      // Display index
     int8_t  isMain;     // Is main display
-    int32_t x, y, w, h; // Virtual (scaled) coordinates and size
+    int32_t x, y;       // Virtual (scaled) coordinates for position
+    int32_t w, h;       // Physical pixel size (not virtual)
     double  scale;      // Scale factor (pixel/virtual)
 } DisplayInfoC;
 
@@ -37,15 +38,20 @@ static int32_t getDisplayCount() {
 static DisplayInfoC getDisplayInfoById(CGDirectDisplayID displayID, int32_t index) {
     DisplayInfoC info = {0};
 
+    // Get virtual bounds (for position in virtual desktop)
     CGRect bounds = CGDisplayBounds(displayID);
 
     info.handle = (uintptr)displayID;
     info.index = index;
     info.isMain = (displayID == CGMainDisplayID()) ? 1 : 0;
+
+    // Position uses virtual coordinates (for locating display in virtual desktop)
     info.x = (int32_t)bounds.origin.x;
     info.y = (int32_t)bounds.origin.y;
-    info.w = (int32_t)bounds.size.width;
-    info.h = (int32_t)bounds.size.height;
+
+    // Size uses physical pixel resolution
+    info.w = (int32_t)CGDisplayPixelsWide(displayID);
+    info.h = (int32_t)CGDisplayPixelsHigh(displayID);
 
     // Get scale factor
     CGDisplayModeRef mode = CGDisplayCopyDisplayMode(displayID);

@@ -11,23 +11,27 @@
 
 package robotgo
 
-import "errors"
+import (
+	"errors"
+)
 
 // ErrCaptureScreen is returned when screen capture fails.
 var ErrCaptureScreen = errors.New("capture screen failed")
 
 // Display represents a physical display/monitor.
 //
-// Coordinate semantics differ by platform:
-//   - Windows: Physical pixel coordinates
-//   - macOS: Virtual (scaled) coordinates
-//   - Linux: Physical pixel coordinates
+// Coordinate semantics:
+//   - bounds.X/Y: Physical position in desktop coordinate system
+//   - bounds.W/H: Physical pixel resolution
+//   - virtualOrigin: Virtual (logical) position (used when DPI awareness fails on Windows)
+//   - Move/Capture/etc: Accept physical pixel coordinates relative to this display
 type Display struct {
-	id     int     // Platform-specific display ID
-	index  int     // Display index (0 is main display)
-	isMain bool    // Whether this is the main display
-	bounds Rect    // Display bounds (relative to virtual screen)
-	scale  float64 // Scale factor (for informational purposes only)
+	id            int     // Platform-specific display ID
+	index         int     // Display index (0 is main display)
+	isMain        bool    // Whether this is the main display
+	bounds        Rect    // Display bounds (X/Y: physical position, W/H: physical size)
+	virtualOrigin Point   // Virtual (logical) origin for coordinate conversion
+	scale         float64 // Scale factor (physical pixels / virtual points)
 }
 
 // DisplayInfo contains detailed information about a display.
@@ -57,27 +61,29 @@ func (d *Display) IsMain() bool {
 	return d.isMain
 }
 
-// Bounds returns the display bounds (relative to virtual screen coordinate system).
+// Bounds returns the display bounds.
+// X/Y: Position in virtual desktop coordinate system
+// W/H: Physical pixel resolution
 func (d *Display) Bounds() Rect {
 	return d.bounds
 }
 
-// Size returns the display size.
+// Size returns the display physical pixel size.
 func (d *Display) Size() Size {
 	return d.bounds.Size
 }
 
-// Width returns the display width.
+// Width returns the display physical pixel width.
 func (d *Display) Width() int {
 	return d.bounds.W
 }
 
-// Height returns the display height.
+// Height returns the display physical pixel height.
 func (d *Display) Height() int {
 	return d.bounds.H
 }
 
-// Scale returns the scale factor (for informational purposes only).
+// Scale returns the scale factor (physical pixels / virtual points).
 //   - Windows: DPI / 96.0
 //   - macOS: PixelWidth / VirtualWidth
 //   - Linux: Xft.dpi / 96.0
@@ -96,22 +102,21 @@ func (d *Display) Info() DisplayInfo {
 	}
 }
 
-// ToAbsolute converts coordinates relative to this display to absolute coordinates.
-func (d *Display) ToAbsolute(x, y int) (absX, absY int) {
-	return d.bounds.X + x, d.bounds.Y + y
-}
-
-// ToRelative converts absolute coordinates to coordinates relative to this display.
-// Returns (0, 0, false) if the coordinate is not within this display.
-func (d *Display) ToRelative(absX, absY int) (x, y int, ok bool) {
-	if !d.Contains(absX, absY) {
-		return 0, 0, false
-	}
-	return absX - d.bounds.X, absY - d.bounds.Y, true
-}
-
-// Contains checks if the specified absolute coordinate is within this display.
-func (d *Display) Contains(absX, absY int) bool {
-	return absX >= d.bounds.X && absX < d.bounds.X+d.bounds.W &&
-		absY >= d.bounds.Y && absY < d.bounds.Y+d.bounds.H
-}
+// Note: The following methods are platform-specific and defined in:
+// - display_darwin.go (macOS): Converts physical coordinates to virtual before calling APIs
+// - display_windows.go (Windows): Uses physical coordinates directly
+// - display_linux.go (Linux): Uses physical coordinates directly
+//
+// Platform-specific methods:
+// - ToAbsolute(x, y int) (absX, absY int)
+// - ToRelative(absX, absY int) (x, y int, ok bool)
+// - Contains(absX, absY int) bool
+// - Move(x, y int)
+// - MoveSmooth(x, y int, args ...interface{}) bool
+// - Drag(fromX, fromY, toX, toY int, button string)
+// - DragTo(x, y int, button string)
+// - Capture() (*image.RGBA, error)
+// - CaptureRect(x, y, w, h int) (*image.RGBA, error)
+// - GetPixelColor(x, y int) string
+// - MouseLocation() (x, y int, ok bool)
+// - ContainsMouse() bool
