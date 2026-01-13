@@ -91,25 +91,43 @@
 	}
 #endif
 
-/* Move the mouse to a specific point. */
-void moveMouse(MMPointInt32 point){
+/* Move the mouse using physical pixel coordinates (not affected by DPI settings).
+ * On Windows: uses SetPhysicalCursorPos for consistent physical pixel positioning
+ * On macOS: converts physical pixels to points using the provided scale factor
+ * On X11: same as moveMouse (X11 already uses physical pixels)
+ */
+void moveMousePhysical(MMPointInt32 point, double scale){
 	#if defined(IS_MACOSX)
-		CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
-		CGEventRef move = CGEventCreateMouseEvent(source, kCGEventMouseMoved, 
-								CGPointFromMMPointInt32(point), kCGMouseButtonLeft);
+		// Convert physical pixels to points
+		CGPoint cgPoint;
+		cgPoint.x = (CGFloat)point.x / scale;
+		cgPoint.y = (CGFloat)point.y / scale;
 
-		calculateDeltas(&move, point);
+		CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
+		CGEventRef move = CGEventCreateMouseEvent(source, kCGEventMouseMoved,
+								cgPoint, kCGMouseButtonLeft);
+
+		// Calculate deltas using point coordinates
+		CGEventRef get = CGEventCreate(NULL);
+		CGPoint mouse = CGEventGetLocation(get);
+		int64_t deltaX = cgPoint.x - mouse.x;
+		int64_t deltaY = cgPoint.y - mouse.y;
+		CGEventSetIntegerValueField(move, kCGMouseEventDeltaX, deltaX);
+		CGEventSetIntegerValueField(move, kCGMouseEventDeltaY, deltaY);
+		CFRelease(get);
 
 		CGEventPost(kCGHIDEventTap, move);
 		CFRelease(move);
 		CFRelease(source);
 	#elif defined(USE_X11)
+		// X11 already uses physical pixels
 		Display *display = XGetMainDisplay();
 		XWarpPointer(display, None, DefaultRootWindow(display), 0, 0, 0, 0, point.x, point.y);
-
 		XSync(display, false);
 	#elif defined(IS_WINDOWS)
-		SetCursorPos(point.x, point.y);
+		// Use SetPhysicalCursorPos for physical pixel positioning
+		// This is not affected by DPI virtualization
+		SetPhysicalCursorPos(point.x, point.y);
 	#endif
 }
 
@@ -130,27 +148,91 @@ void dragMouse(MMPointInt32 point, const MMMouseButton button){
 	#endif
 }
 
-MMPointInt32 location() {
+/* Get mouse location in physical pixel coordinates.
+ * On Windows: uses GetPhysicalCursorPos for consistent physical pixel positioning
+ * On macOS: converts points to physical pixels using the display's scale factor
+ * On X11: same as location (X11 already uses physical pixels)
+ */
+MMPointInt32 locationPhysical(double scale) {
 	#if defined(IS_MACOSX)
 		CGEventRef event = CGEventCreate(NULL);
-		CGPoint point = CGEventGetLocation(event);
+		CGPoint pointInPoints = CGEventGetLocation(event);
 		CFRelease(event);
 
-		return MMPointInt32FromCGPoint(point);
+		// Convert points to physical pixels
+		return MMPointInt32Make(
+			(int32_t)(pointInPoints.x * scale),
+			(int32_t)(pointInPoints.y * scale)
+		);
 	#elif defined(USE_X11)
-		int x, y; 	/* This is all we care about. Seriously. */
-		Window garb1, garb2; 	/* Why you can't specify NULL as a parameter */
-		int garb_x, garb_y;  	/* is beyond me. */
+		// X11 already uses physical pixels
+		int x, y;
+		Window garb1, garb2;
+		int garb_x, garb_y;
 		unsigned int more_garbage;
 
 		Display *display = XGetMainDisplay();
-		XQueryPointer(display, XDefaultRootWindow(display), &garb1, &garb2, &x, &y, 
+		XQueryPointer(display, XDefaultRootWindow(display), &garb1, &garb2, &x, &y,
 						&garb_x, &garb_y, &more_garbage);
 
 		return MMPointInt32Make(x, y);
 	#elif defined(IS_WINDOWS)
 		POINT point;
-		GetCursorPos(&point);
+		// Use GetPhysicalCursorPos for physical pixel positioning
+		// This is not affected by DPI virtualization
+		GetPhysicalCursorPos(&point);
+		return MMPointInt32FromPOINT(point);
+	#endif
+}
+
+/* Get mouse location in physical pixel coordinates with auto-detected scale.
+ * On macOS: determines which display the cursor is on and uses that display's scale
+ * On Windows/X11: same as locationPhysical (scale doesn't matter)
+ */
+MMPointInt32 locationPhysicalAuto() {
+	#if defined(IS_MACOSX)
+		CGEventRef event = CGEventCreate(NULL);
+		CGPoint pointInPoints = CGEventGetLocation(event);
+		CFRelease(event);
+
+		// Find which display contains this point
+		CGDirectDisplayID displayID;
+		uint32_t count;
+		CGGetDisplaysWithPoint(pointInPoints, 1, &displayID, &count);
+
+		if (count == 0) {
+			// Default to main display if no display found
+			displayID = CGMainDisplayID();
+		}
+
+		// Get scale factor for that display
+		CGDisplayModeRef modeRef = CGDisplayCopyDisplayMode(displayID);
+		double pixelWidth = CGDisplayModeGetPixelWidth(modeRef);
+		double targetWidth = CGDisplayModeGetWidth(modeRef);
+		CGDisplayModeRelease(modeRef);
+
+		double scale = pixelWidth / targetWidth;
+
+		// Convert points to physical pixels
+		return MMPointInt32Make(
+			(int32_t)(pointInPoints.x * scale),
+			(int32_t)(pointInPoints.y * scale)
+		);
+	#elif defined(USE_X11)
+		// X11 already uses physical pixels
+		int x, y;
+		Window garb1, garb2;
+		int garb_x, garb_y;
+		unsigned int more_garbage;
+
+		Display *display = XGetMainDisplay();
+		XQueryPointer(display, XDefaultRootWindow(display), &garb1, &garb2, &x, &y,
+						&garb_x, &garb_y, &more_garbage);
+
+		return MMPointInt32Make(x, y);
+	#elif defined(IS_WINDOWS)
+		POINT point;
+		GetPhysicalCursorPos(&point);
 		return MMPointInt32FromPOINT(point);
 	#endif
 }

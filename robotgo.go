@@ -78,13 +78,8 @@ var (
 	// KeySleep set the key default millisecond sleep time
 	KeySleep = 10
 
-	// DisplayID set the screen display id
-	DisplayID = -1
-
 	// NotPid used the hwnd not pid in windows
 	NotPid bool
-	// Scale option the os screen scale
-	Scale bool
 )
 
 type (
@@ -230,10 +225,20 @@ func GetPixelColor(x, y int, displayId ...int) string {
 	return PadHex(GetPxColor(x, y, displayId...))
 }
 
-// GetLocationColor get the location pos's color
-func GetLocationColor(displayId ...int) string {
-	x, y := Location()
-	return GetPixelColor(x, y, displayId...)
+// GetLocationColor gets the color at the current mouse position.
+// Auto-detects which display the mouse is on.
+func GetLocationColor() (string, error) {
+	x, y, err := Location()
+	if err != nil {
+		return "", err
+	}
+	// TODO: Phase 5 will update this to use Display methods
+	// For now, use the old API with display auto-detection
+	display, err := DisplayAt(x, y)
+	if err != nil {
+		return GetPixelColor(x, y), nil
+	}
+	return GetPixelColor(x, y, int(display.id)), nil
 }
 
 // IsMain is main display
@@ -241,20 +246,12 @@ func IsMain(displayId int) bool {
 	return displayId == GetMainId()
 }
 
+// displayIdx returns the display index, defaulting to -1 (main display)
 func displayIdx(id ...int) int {
-	display := -1
-	if DisplayID != -1 {
-		display = DisplayID
-	}
 	if len(id) > 0 {
-		display = id[0]
+		return id[0]
 	}
-
-	return display
-}
-
-func getNumDisplays() int {
-	return int(C.get_num_displays())
+	return -1
 }
 
 // GetHWNDByPid get the hwnd by pid
@@ -323,13 +320,12 @@ func GetScaleSize(displayId ...int) (int, int) {
 // CaptureScreen capture the screen return bitmap(c struct),
 // use `defer robotgo.FreeBitmap(bitmap)` to free the bitmap
 //
+// Deprecated: Use Display.Capture() instead for physical pixel coordinates.
+//
 // robotgo.CaptureScreen(x, y, w, h int)
 func CaptureScreen(args ...int) CBitmap {
 	var x, y, w, h C.int32_t
 	displayId := -1
-	if DisplayID != -1 {
-		displayId = DisplayID
-	}
 
 	if len(args) > 4 {
 		displayId = args[4]
@@ -471,13 +467,6 @@ func CloseMainDisplay() {
 	C.close_main_display()
 }
 
-// Deprecated: use the ScaledF(),
-//
-// ScaleX get the primary display horizontal DPI scale factor, drop
-func ScaleX() int {
-	return int(C.scaleX())
-}
-
 /*
 .___  ___.   ______    __    __       _______. _______
 |   \/   |  /  __  \  |  |  |  |     /       ||   ____|
@@ -525,138 +514,124 @@ func MouseButtonString(btn C.MMMouseButton) string {
 	return fmt.Sprintf("button%d", btn)
 }
 
-// MoveScale calculate the os scale factor x, y
-func MoveScale(x, y int, displayId ...int) (int, int) {
-	if Scale || runtime.GOOS == "windows" {
-		f := ScaleF()
-		x, y = Scaled1(x, f), Scaled1(y, f)
-	}
-
-	return x, y
-}
-
-// Move move the mouse to (x, y)
+// Move moves the mouse to physical pixel coordinates (x, y) in the virtual screen.
+// The coordinates should be in physical pixels, not logical/scaled coordinates.
+// Returns error if the move fails.
 //
 // Examples:
 //
 //	robotgo.MouseSleep = 100  // 100 millisecond
-//	robotgo.Move(10, 10)
-func Move(x, y int, displayId ...int) {
-	x, y = MoveScale(x, y, displayId...)
-
-	cx := C.int32_t(x)
-	cy := C.int32_t(y)
-	C.moveMouse(C.MMPointInt32Make(cx, cy))
-
-	MilliSleep(MouseSleep)
-}
-
-// Deprecated: use the DragSmooth(),
-//
-// Drag drag the mouse to (x, y),
-// It's not valid now, use the DragSmooth()
-func Drag(x, y int, args ...string) {
-	x, y = MoveScale(x, y)
-
-	var button C.MMMouseButton = C.LEFT_BUTTON
-	cx := C.int32_t(x)
-	cy := C.int32_t(y)
-
-	if len(args) > 0 {
-		button = CheckMouse(args[0])
+//	err := robotgo.Move(100, 100)
+func Move(x, y int) error {
+	// Find the display containing the target point to get its scale factor
+	display, err := DisplayAt(x, y)
+	if err != nil {
+		// If no display found at that point, use main display scale
+		// This allows moving to positions between displays
+		display, err = MainDisplay()
+		if err != nil {
+			return err
+		}
 	}
 
-	C.dragMouse(C.MMPointInt32Make(cx, cy), button)
+	point := C.MMPointInt32Make(C.int32_t(x), C.int32_t(y))
+	C.moveMousePhysical(point, C.double(display.Scale))
+
 	MilliSleep(MouseSleep)
+	return nil
 }
 
-// DragSmooth drag the mouse like smooth to (x, y)
+// DragSmooth drags the mouse smoothly to physical pixel coordinates (x, y).
+// This holds the left mouse button down, moves smoothly, then releases.
+// low and high control the speed range (milliseconds between moves).
 //
 // Examples:
 //
-//	robotgo.DragSmooth(10, 10)
-func DragSmooth(x, y int, args ...interface{}) {
+//	err := robotgo.DragSmooth(100, 100, 1.0, 3.0)
+func DragSmooth(x, y int, low, high float64) error {
 	Toggle("left")
 	MilliSleep(50)
-	MoveSmooth(x, y, args...)
+	err := MoveSmooth(x, y, low, high)
 	Toggle("left", "up")
+	return err
 }
 
-// MoveSmooth move the mouse smooth,
-// moves mouse to x, y human like, with the mouse button up.
-//
-// robotgo.MoveSmooth(x, y int, low, high float64, mouseDelay int)
+// MoveSmooth moves the mouse smoothly to physical pixel coordinates (x, y).
+// The movement simulates human-like mouse motion.
+// low and high control the speed range (milliseconds between moves), default 1.0-3.0.
 //
 // Examples:
 //
-//	robotgo.MoveSmooth(10, 10)
-//	robotgo.MoveSmooth(10, 10, 1.0, 2.0)
-func MoveSmooth(x, y int, args ...interface{}) bool {
-	// if runtime.GOOS == "windows" {
-	// 	f := ScaleF()
-	// 	x, y = Scaled0(x, f), Scaled0(y, f)
-	// }
-	x, y = MoveScale(x, y)
-
-	cx := C.int32_t(x)
-	cy := C.int32_t(y)
-
-	var (
-		mouseDelay = 1
-		low        C.double
-		high       C.double
-	)
-
-	if len(args) > 2 {
-		mouseDelay = args[2].(int)
+//	err := robotgo.MoveSmooth(100, 100, 1.0, 3.0)
+func MoveSmooth(x, y int, low, high float64) error {
+	// Find the display containing the target point to get its scale factor
+	display, err := DisplayAt(x, y)
+	if err != nil {
+		// If no display found at that point, use main display scale
+		display, err = MainDisplay()
+		if err != nil {
+			return err
+		}
 	}
 
-	if len(args) > 1 {
-		low = C.double(args[0].(float64))
-		high = C.double(args[1].(float64))
-	} else {
-		low = 1.0
-		high = 3.0
+	// Note: smoothlyMoveMouse internally calls moveMouse which uses logical coords
+	// We need to convert physical pixels to logical coords for macOS
+	lx, ly := x, y
+	if isMacOSPlatform {
+		lx = int(float64(x) / display.Scale)
+		ly = int(float64(y) / display.Scale)
 	}
 
-	cbool := C.smoothlyMoveMouse(C.MMPointInt32Make(cx, cy), low, high)
-	MilliSleep(MouseSleep + mouseDelay)
+	point := C.MMPointInt32Make(C.int32_t(lx), C.int32_t(ly))
+	C.smoothlyMoveMouse(point, C.double(low), C.double(high))
 
-	return bool(cbool)
+	MilliSleep(MouseSleep)
+	return nil
 }
 
-// MoveArgs get the mouse relative args
-func MoveArgs(x, y int) (int, int) {
-	mx, my := Location()
-	mx = mx + x
-	my = my + y
-
-	return mx, my
+// MoveArgs returns the absolute coordinates for a relative move.
+// Returns the sum of current position and the given offset.
+func MoveArgs(dx, dy int) (int, int, error) {
+	mx, my, err := Location()
+	if err != nil {
+		return 0, 0, err
+	}
+	return mx + dx, my + dy, nil
 }
 
-// MoveRelative move mouse with relative
-func MoveRelative(x, y int) {
-	Move(MoveArgs(x, y))
+// MoveRelative moves the mouse relative to its current position.
+// dx and dy are the offset in physical pixels.
+func MoveRelative(dx, dy int) error {
+	mx, my, err := MoveArgs(dx, dy)
+	if err != nil {
+		return err
+	}
+	return Move(mx, my)
 }
 
-// MoveSmoothRelative move mouse smooth with relative
-func MoveSmoothRelative(x, y int, args ...interface{}) {
-	mx, my := MoveArgs(x, y)
-	MoveSmooth(mx, my, args...)
+// MoveSmoothRelative moves the mouse smoothly relative to its current position.
+// dx and dy are the offset in physical pixels.
+// low and high control the speed range (milliseconds between moves).
+func MoveSmoothRelative(dx, dy int, low, high float64) error {
+	mx, my, err := MoveArgs(dx, dy)
+	if err != nil {
+		return err
+	}
+	return MoveSmooth(mx, my, low, high)
 }
 
-// Location get the mouse location position return x, y
-func Location() (int, int) {
-	pos := C.location()
+// Location returns the current mouse position in physical pixel coordinates.
+// The coordinates are in the virtual screen coordinate space (physical pixels).
+//
+// Examples:
+//
+//	x, y, err := robotgo.Location()
+func Location() (int, int, error) {
+	pos := C.locationPhysicalAuto()
 	x := int(pos.x)
 	y := int(pos.y)
 
-	if Scale || runtime.GOOS == "windows" {
-		f := ScaleF()
-		x, y = Scaled0(x, f), Scaled0(y, f)
-	}
-
-	return x, y
+	return x, y, nil
 }
 
 // Click click the mouse button
@@ -792,27 +767,34 @@ func MultiClickE(button string, clickCount int) error {
 	return nil
 }
 
-// MoveClick move and click the mouse
-//
-// robotgo.MoveClick(x, y int, button string, double bool)
+// MoveClick moves and clicks the mouse.
+// Moves to physical pixel coordinates (x, y), then clicks.
 //
 // Examples:
 //
 //	robotgo.MouseSleep = 100
-//	robotgo.MoveClick(10, 10)
-func MoveClick(x, y int, args ...interface{}) {
-	Move(x, y)
+//	err := robotgo.MoveClick(100, 100, "left", false)
+func MoveClick(x, y int, button string, double bool) error {
+	if err := Move(x, y); err != nil {
+		return err
+	}
 	MilliSleep(50)
-	Click(args...)
+	return ClickE(button, double)
 }
 
-// MovesClick move smooth and click the mouse
+// MovesClick moves smoothly and clicks the mouse.
+// Moves smoothly to physical pixel coordinates (x, y), then clicks.
+// low and high control the smooth move speed range.
 //
-// use the `robotgo.MouseSleep = 100`
-func MovesClick(x, y int, args ...interface{}) {
-	MoveSmooth(x, y)
+// Examples:
+//
+//	err := robotgo.MovesClick(100, 100, "left", false, 1.0, 3.0)
+func MovesClick(x, y int, button string, double bool, low, high float64) error {
+	if err := MoveSmooth(x, y, low, high); err != nil {
+		return err
+	}
 	MilliSleep(50)
-	Click(args...)
+	return ClickE(button, double)
 }
 
 // Toggle toggle the mouse, support button:
@@ -939,13 +921,15 @@ func ScrollSmooth(to int, args ...int) {
 	MilliSleep(MouseSleep)
 }
 
-// ScrollRelative scroll mouse with relative
+// ScrollRelative scrolls mouse with relative positioning.
+// Note: This function's behavior is unusual - it scrolls at the position
+// offset from current mouse position, not scroll by that amount.
 //
 // Examples:
 //
 //	robotgo.ScrollRelative(10, 10)
 func ScrollRelative(x, y int, args ...int) {
-	mx, my := MoveArgs(x, y)
+	mx, my, _ := MoveArgs(x, y)
 	Scroll(mx, my, args...)
 }
 

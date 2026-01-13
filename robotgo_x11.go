@@ -19,7 +19,6 @@ import (
 	"log"
 
 	"github.com/robotn/xgb"
-	"github.com/robotn/xgb/xinerama"
 	"github.com/robotn/xgb/xproto"
 	"github.com/robotn/xgbutil"
 	"github.com/robotn/xgbutil/ewmh"
@@ -175,27 +174,6 @@ func GetXidByPid(xu *xgbutil.XUtil, pid int) (xproto.Window, error) {
 	}
 
 	return 0, errors.New("failed to find a window with a matching pid.")
-}
-
-// DisplaysNum get the count of displays
-func DisplaysNum() int {
-	c, err := xgb.NewConn()
-	if err != nil {
-		return 0
-	}
-	defer c.Close()
-
-	err = xinerama.Init(c)
-	if err != nil {
-		return 0
-	}
-
-	reply, err := xinerama.QueryScreens(c).Reply()
-	if err != nil {
-		return 0
-	}
-
-	return int(reply.Number)
 }
 
 // GetMainId get the main display id

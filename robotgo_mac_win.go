@@ -63,11 +63,6 @@ func ActivePid(pid int, args ...int) error {
 	return nil
 }
 
-// DisplaysNum get the count of displays
-func DisplaysNum() int {
-	return getNumDisplays()
-}
-
 // Alert show a alert window
 // Displays alert with the attributes.
 // If cancel button is not given, only the default button is displayed

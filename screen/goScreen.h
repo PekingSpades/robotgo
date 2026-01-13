@@ -87,24 +87,6 @@ void close_main_display() {
 	#endif
 }
 
-uint32_t get_num_displays() {
-	#if defined(IS_MACOSX)
-		uint32_t count = 0;
-		if (CGGetActiveDisplayList(0, nil, &count) == kCGErrorSuccess) {
-			return count;
-		}
-		return 0;
-	#elif defined(USE_X11)
-		return 0;
-	#elif defined(IS_WINDOWS)
-		uint32_t count = 0;
-		if (EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, (LPARAM)&count)) {
-			return count;
-		}
-		return 0;
-	#endif
-}
-
 uintptr get_hwnd_by_pid(uintptr pid) {
 	#if defined(IS_WINDOWS)
 		HWND hwnd = GetHwndByPid(pid);

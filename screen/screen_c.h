@@ -8,19 +8,17 @@
 	// #include "../base/xdisplay_c.h"
 #endif
 
-intptr scaleX();
-
 double sys_scale(int32_t display_id) {
 	#if defined(IS_MACOSX)
 		CGDirectDisplayID displayID = (CGDirectDisplayID) display_id;
 		if (displayID == -1) {
 			displayID = CGMainDisplayID();
 		}
-		
+
 		CGDisplayModeRef modeRef = CGDisplayCopyDisplayMode(displayID);
 		double pixelWidth = CGDisplayModeGetPixelWidth(modeRef);
 		double targetWidth = CGDisplayModeGetWidth(modeRef);
-	
+
 		return pixelWidth / targetWidth;
 	#elif defined(USE_X11)
 		Display *dpy = XOpenDisplay(NULL);
@@ -49,23 +47,13 @@ double sys_scale(int32_t display_id) {
 
 		return xres / 96.0;
    	#elif defined(IS_WINDOWS)
-   		double s = scaleX() / 96.0;
-   		return s;
-   	#endif
-}
-
-intptr scaleX(){
-	#if defined(IS_MACOSX)
-		return 0;
-	#elif defined(USE_X11)
-		return 0;
-	#elif defined(IS_WINDOWS)
 		// Get desktop dc
 		HDC desktopDc = GetDC(NULL);
-		// Get native resolution
+		// Get native resolution (horizontal DPI)
 		intptr horizontalDPI = GetDeviceCaps(desktopDc, LOGPIXELSX);
-		return horizontalDPI;
-	#endif
+		ReleaseDC(NULL, desktopDc);
+		return (double)horizontalDPI / 96.0;
+   	#endif
 }
 
 MMSizeInt32 getMainDisplaySize(void) {

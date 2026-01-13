@@ -31,39 +31,47 @@ func TestColor(t *testing.T) {
 }
 
 func TestSize(t *testing.T) {
-	x, y := GetScreenSize()
-	tt.NotZero(t, x)
-	tt.NotZero(t, y)
+	// Test the new Display API
+	display, err := MainDisplay()
+	tt.Nil(t, err)
+	tt.NotZero(t, display.Width)
+	tt.NotZero(t, display.Height)
 
-	x, y = GetScaleSize()
+	// Test deprecated function still works
+	x, y := GetScreenSize()
 	tt.NotZero(t, x)
 	tt.NotZero(t, y)
 }
 
 func TestMoveMouse(t *testing.T) {
-	Move(20, 20)
+	err := Move(20, 20)
+	tt.Nil(t, err)
 	MilliSleep(50)
-	x, y := Location()
+	x, y, err := Location()
 
+	tt.Nil(t, err)
 	tt.Equal(t, 20, x)
 	tt.Equal(t, 20, y)
 }
 
 func TestMoveMouseSmooth(t *testing.T) {
-	b := MoveSmooth(100, 100)
+	err := MoveSmooth(100, 100, 1.0, 3.0)
+	tt.Nil(t, err)
 	MilliSleep(50)
-	x, y := Location()
+	x, y, err := Location()
 
-	tt.True(t, b)
+	tt.Nil(t, err)
 	tt.Equal(t, 100, x)
 	tt.Equal(t, 100, y)
 }
 
 func TestDragMouse(t *testing.T) {
-	DragSmooth(500, 500)
+	err := DragSmooth(500, 500, 1.0, 3.0)
+	tt.Nil(t, err)
 	MilliSleep(50)
-	x, y := Location()
+	x, y, err := Location()
 
+	tt.Nil(t, err)
 	tt.Equal(t, 500, x)
 	tt.Equal(t, 500, y)
 }
@@ -80,25 +88,31 @@ func TestScrollMouse(t *testing.T) {
 }
 
 func TestMoveRelative(t *testing.T) {
-	Move(200, 200)
+	err := Move(200, 200)
+	tt.Nil(t, err)
 	MilliSleep(50)
 
-	MoveRelative(10, -10)
+	err = MoveRelative(10, -10)
+	tt.Nil(t, err)
 	MilliSleep(50)
 
-	x, y := Location()
+	x, y, err := Location()
+	tt.Nil(t, err)
 	tt.Equal(t, 210, x)
 	tt.Equal(t, 190, y)
 }
 
 func TestMoveSmoothRelative(t *testing.T) {
-	Move(200, 200)
+	err := Move(200, 200)
+	tt.Nil(t, err)
 	MilliSleep(50)
 
-	MoveSmoothRelative(10, -10)
+	err = MoveSmoothRelative(10, -10, 1.0, 3.0)
+	tt.Nil(t, err)
 	MilliSleep(50)
 
-	x, y := Location()
+	x, y, err := Location()
+	tt.Nil(t, err)
 	tt.Equal(t, 210, x)
 	tt.Equal(t, 190, y)
 }

@@ -17,35 +17,30 @@ func main() {
 	// bitmap.Save(bitmap, "test.png")
 	robotgo.Save(robotgo.ToImage(bitmap), "test.png")
 
-	robotgo.Scale = true
-	robotgo.Move(10, 10)
-	robotgo.MoveSmooth(100, 100)
-
-	fmt.Println(robotgo.Location())
-
-	num := robotgo.DisplaysNum()
-	for i := 0; i < num; i++ {
-		rect := robotgo.GetScreenRect(i)
-		fmt.Println("rect: ", rect)
+	// Use the new Display API for physical pixel operations
+	display, err := robotgo.MainDisplay()
+	if err != nil {
+		fmt.Println("error getting main display:", err)
+		return
 	}
-}
+	fmt.Println("Main display:", display.Width, "x", display.Height, "scale:", display.Scale)
 
-func old() {
-	sx := robotgo.ScaleX() // Deprecated
-	s := robotgo.Scale1()  // Deprecated, use the ScaleF() function
-	robotx, roboty := 35*s/100, 25*s/100
-	fmt.Println("scale: ", sx, s, " pos: ", robotx, roboty)
+	robotgo.Move(10, 10)
+	robotgo.MoveSmooth(100, 100, 1.0, 3.0)
 
-	mx, my := robotgo.Location()
-	sx, sy := mx*s/100, my*s/100
+	x, y, _ := robotgo.Location()
+	fmt.Println("Location:", x, y)
 
-	rx, ry, rw, rh := sx, sy, robotx, roboty
-	// bit1 := robotgo.CaptureScreen(10, 20, robotw, roboth)
-	bit1 := robotgo.CaptureScreen(rx, ry, rw, rh)
-	defer robotgo.FreeBitmap(bit1)
-	// bitmap.Save(bit1, "test2.png")
-	robotgo.Save(robotgo.ToImage(bit1), "test2.png")
+	// List all displays
+	displays, _ := robotgo.Displays()
+	for i, d := range displays {
+		fmt.Printf("Display %d: %dx%d at (%d,%d) scale=%.2f\n",
+			i, d.Width, d.Height, d.X, d.Y, d.Scale)
+	}
 
-	clo := robotgo.GetPixelColor(robotx, roboty)
-	fmt.Println("GetPixelColor...", clo)
+	// Get pixel color using new Display API
+	color, err := display.GetPixelColor(100, 100)
+	if err == nil {
+		fmt.Println("Pixel color at (100, 100):", color)
+	}
 }

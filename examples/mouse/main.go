@@ -26,12 +26,12 @@ func move() {
 	// move the mouse to 100, 200
 	robotgo.Move(100, 200)
 
-	// drag mouse with smooth
-	robotgo.DragSmooth(10, 10)
+	// drag mouse with smooth (requires low, high speed params)
+	robotgo.DragSmooth(10, 10, 1.0, 3.0)
 	robotgo.DragSmooth(100, 200, 1.0, 100.0)
 
-	// smooth move the mouse to 100, 200
-	robotgo.MoveSmooth(100, 200)
+	// smooth move the mouse to 100, 200 (requires low, high speed params)
+	robotgo.MoveSmooth(100, 200, 1.0, 3.0)
 	robotgo.MoveSmooth(100, 200, 1.0, 100.0)
 	robotgo.MoveSmoothRelative(10, -100, 1.0, 30.0)
 
@@ -55,8 +55,12 @@ func click() {
 }
 
 func get() {
-	// gets the mouse coordinates
-	x, y := robotgo.Location()
+	// gets the mouse coordinates (now returns 3 values)
+	x, y, err := robotgo.Location()
+	if err != nil {
+		fmt.Println("error getting location:", err)
+		return
+	}
 	fmt.Println("pos:", x, y)
 	if x == 456 && y == 586 {
 		fmt.Println("mouse...", "586")

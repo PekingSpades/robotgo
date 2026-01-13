@@ -36,15 +36,25 @@ func bitmap() {
 	fmt.Println("error: ", err)
 	robotgo.Save(img, "save.png")
 
-	num := robotgo.DisplaysNum()
-	for i := 0; i < num; i++ {
-		robotgo.DisplayID = i
-		img1, _ := robotgo.CaptureImg()
+	// Use the new Display API for multi-monitor capture
+	displays, _ := robotgo.Displays()
+	for i, display := range displays {
+		// Capture using new Display API
+		img1, err := display.CaptureAllImage()
+		if err != nil {
+			fmt.Println("Capture error:", err)
+			continue
+		}
 		path1 := "save_" + strconv.Itoa(i)
 		robotgo.Save(img1, path1+".png")
 		robotgo.SaveJpeg(img1, path1+".jpeg", 50)
 
-		img2, _ := robotgo.CaptureImg(10, 10, 20, 20)
+		// Capture a region using Display.CaptureImage
+		img2, err := display.CaptureImage(10, 10, 20, 20)
+		if err != nil {
+			fmt.Println("Capture error:", err)
+			continue
+		}
 		path2 := "test_" + strconv.Itoa(i)
 		robotgo.Save(img2, path2+".png")
 		robotgo.SaveJpeg(img2, path2+".jpeg", 50)

@@ -33,11 +33,10 @@ func GetDisplayRect(i int) Rect {
 }
 
 // Capture capture the screenshot, use the CaptureImg default
+//
+// Deprecated: Use Display.CaptureRGBA() instead for physical pixel coordinates.
 func Capture(args ...int) (*image.RGBA, error) {
 	displayId := 0
-	if DisplayID != -1 {
-		displayId = DisplayID
-	}
 
 	if len(args) > 4 {
 		displayId = args[4]
