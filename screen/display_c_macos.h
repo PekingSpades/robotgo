@@ -14,6 +14,7 @@
 
 #include "../base/types.h"
 #include <ApplicationServices/ApplicationServices.h>
+#include <stdio.h>
 
 // DisplayInfoC contains display information in C struct
 typedef struct {
@@ -49,27 +50,46 @@ static DisplayInfoC getDisplayInfoById(CGDirectDisplayID displayID, int32_t inde
     info.x = (int32_t)bounds.origin.x;
     info.y = (int32_t)bounds.origin.y;
 
+    // Print bounds info
+    printf("[Display %d] CGDisplayBounds: x=%.0f, y=%.0f, width=%.0f, height=%.0f\n",
+           index, bounds.origin.x, bounds.origin.y, bounds.size.width, bounds.size.height);
+
     // Get display mode for physical pixel size and scale factor
     // Note: CGDisplayPixelsWide/High returns points (not pixels) despite its name
     CGDisplayModeRef mode = CGDisplayCopyDisplayMode(displayID);
     if (mode != NULL) {
         // Physical pixel resolution from display mode
-        info.w = (int32_t)CGDisplayModeGetPixelWidth(mode);
-        info.h = (int32_t)CGDisplayModeGetPixelHeight(mode);
+        size_t pixelWidth = CGDisplayModeGetPixelWidth(mode);
+        size_t pixelHeight = CGDisplayModeGetPixelHeight(mode);
+        info.w = (int32_t)pixelWidth;
+        info.h = (int32_t)pixelHeight;
+
+        // Get virtual (logical points) width/height
+        size_t virtualWidth = CGDisplayModeGetWidth(mode);
+        size_t virtualHeight = CGDisplayModeGetHeight(mode);
+
+        // Print all the values
+        printf("[Display %d] CGDisplayModeGetPixelWidth:  %zu\n", index, pixelWidth);
+        printf("[Display %d] CGDisplayModeGetPixelHeight: %zu\n", index, pixelHeight);
+        printf("[Display %d] CGDisplayModeGetWidth:       %zu (logical points)\n", index, virtualWidth);
+        printf("[Display %d] CGDisplayModeGetHeight:      %zu (logical points)\n", index, virtualHeight);
 
         // Calculate scale factor (physical pixels / logical points)
-        size_t virtualWidth = CGDisplayModeGetWidth(mode);
         if (virtualWidth > 0) {
             info.scale = (double)info.w / (double)virtualWidth;
         } else {
             info.scale = 1.0;
         }
+        printf("[Display %d] Scale factor: %.2f\n", index, info.scale);
+
         CGDisplayModeRelease(mode);
     } else {
         // Fallback: CGDisplayPixelsWide/High returns points (logical), not physical pixels
         info.w = (int32_t)CGDisplayPixelsWide(displayID);
         info.h = (int32_t)CGDisplayPixelsHigh(displayID);
         info.scale = 1.0;
+        printf("[Display %d] Fallback - CGDisplayPixelsWide: %d, CGDisplayPixelsHigh: %d\n",
+               index, info.w, info.h);
     }
 
     return info;
