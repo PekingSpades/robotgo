@@ -26,16 +26,18 @@ import "image"
 // MainDisplay returns the main display.
 func MainDisplay() *Display {
 	info := C.getMainDisplay()
+	origin := Point{X: int(info.x), Y: int(info.y)}
+	if !dpiAware {
+		// When DPI unaware, use virtual coordinates as origin
+		origin = Point{X: int(info.vx), Y: int(info.vy)}
+	}
 	return &Display{
 		id:     int(info.handle),
 		index:  int(info.index),
 		isMain: info.isMain != 0,
-		bounds: Rect{
-			Point: Point{X: int(info.x), Y: int(info.y)},
-			Size:  Size{W: int(info.w), H: int(info.h)},
-		},
-		virtualOrigin: Point{X: int(info.vx), Y: int(info.vy)},
-		scale:         float64(info.scale),
+		origin: origin,
+		size:   Size{W: int(info.w), H: int(info.h)},
+		scale:  float64(info.scale),
 	}
 }
 
@@ -52,16 +54,17 @@ func AllDisplays() []*Display {
 	displays := make([]*Display, actualCount)
 	for i := 0; i < actualCount; i++ {
 		info := cDisplays[i]
+		origin := Point{X: int(info.x), Y: int(info.y)}
+		if !dpiAware {
+			origin = Point{X: int(info.vx), Y: int(info.vy)}
+		}
 		displays[i] = &Display{
 			id:     int(info.handle),
 			index:  int(info.index),
 			isMain: info.isMain != 0,
-			bounds: Rect{
-				Point: Point{X: int(info.x), Y: int(info.y)},
-				Size:  Size{W: int(info.w), H: int(info.h)},
-			},
-			virtualOrigin: Point{X: int(info.vx), Y: int(info.vy)},
-			scale:         float64(info.scale),
+			origin: origin,
+			size:   Size{W: int(info.w), H: int(info.h)},
+			scale:  float64(info.scale),
 		}
 	}
 
@@ -80,16 +83,17 @@ func DisplayAt(index int) *Display {
 		return nil
 	}
 
+	origin := Point{X: int(info.x), Y: int(info.y)}
+	if !dpiAware {
+		origin = Point{X: int(info.vx), Y: int(info.vy)}
+	}
 	return &Display{
 		id:     int(info.handle),
 		index:  int(info.index),
 		isMain: info.isMain != 0,
-		bounds: Rect{
-			Point: Point{X: int(info.x), Y: int(info.y)},
-			Size:  Size{W: int(info.w), H: int(info.h)},
-		},
-		virtualOrigin: Point{X: int(info.vx), Y: int(info.vy)},
-		scale:         float64(info.scale),
+		origin: origin,
+		size:   Size{W: int(info.w), H: int(info.h)},
+		scale:  float64(info.scale),
 	}
 }
 
@@ -101,36 +105,33 @@ func DisplayCount() int {
 // virtualWidth returns the virtual (logical) width of the display.
 func (d *Display) virtualWidth() int {
 	if d.scale > 0 {
-		return int(float64(d.bounds.W) / d.scale)
+		return int(float64(d.size.W) / d.scale)
 	}
-	return d.bounds.W
+	return d.size.W
 }
 
 // virtualHeight returns the virtual (logical) height of the display.
 func (d *Display) virtualHeight() int {
 	if d.scale > 0 {
-		return int(float64(d.bounds.H) / d.scale)
+		return int(float64(d.size.H) / d.scale)
 	}
-	return d.bounds.H
+	return d.size.H
 }
 
 // ToAbsolute converts physical pixel coordinates relative to this display
 // to absolute coordinates suitable for mouse APIs.
-// When DPI awareness is active: returns physical absolute coordinates
-// When DPI awareness fails: returns virtual absolute coordinates
 func (d *Display) ToAbsolute(physX, physY int) (absX, absY int) {
 	if dpiAware {
-		// DPI aware: use physical coordinates directly
-		return d.bounds.X + physX, d.bounds.Y + physY
+		// DPI aware: origin is physical, coordinates are physical
+		return d.origin.X + physX, d.origin.Y + physY
 	}
-	// DPI unaware: convert physical to virtual coordinates
-	// Mouse APIs use virtual coordinates when DPI awareness fails
+	// DPI unaware: origin is virtual, convert physical to virtual
 	if d.scale > 0 {
-		absX = d.virtualOrigin.X + int(float64(physX)/d.scale)
-		absY = d.virtualOrigin.Y + int(float64(physY)/d.scale)
+		absX = d.origin.X + int(float64(physX)/d.scale)
+		absY = d.origin.Y + int(float64(physY)/d.scale)
 	} else {
-		absX = d.virtualOrigin.X + physX
-		absY = d.virtualOrigin.Y + physY
+		absX = d.origin.X + physX
+		absY = d.origin.Y + physY
 	}
 	return
 }
@@ -144,11 +145,11 @@ func (d *Display) ToRelative(absX, absY int) (physX, physY int, ok bool) {
 	}
 	if dpiAware {
 		// DPI aware: coordinates are physical
-		return absX - d.bounds.X, absY - d.bounds.Y, true
+		return absX - d.origin.X, absY - d.origin.Y, true
 	}
 	// DPI unaware: coordinates are virtual, convert to physical
-	virtRelX := absX - d.virtualOrigin.X
-	virtRelY := absY - d.virtualOrigin.Y
+	virtRelX := absX - d.origin.X
+	virtRelY := absY - d.origin.Y
 	if d.scale > 0 {
 		physX = int(float64(virtRelX) * d.scale)
 		physY = int(float64(virtRelY) * d.scale)
@@ -160,18 +161,17 @@ func (d *Display) ToRelative(absX, absY int) (physX, physY int, ok bool) {
 }
 
 // Contains checks if the specified absolute coordinate is within this display.
-// The coordinate system depends on DPI awareness state.
 func (d *Display) Contains(absX, absY int) bool {
 	if dpiAware {
-		// DPI aware: use physical coordinates
-		return absX >= d.bounds.X && absX < d.bounds.X+d.bounds.W &&
-			absY >= d.bounds.Y && absY < d.bounds.Y+d.bounds.H
+		// DPI aware: use physical size
+		return absX >= d.origin.X && absX < d.origin.X+d.size.W &&
+			absY >= d.origin.Y && absY < d.origin.Y+d.size.H
 	}
-	// DPI unaware: use virtual coordinates
+	// DPI unaware: use virtual size
 	virtW := d.virtualWidth()
 	virtH := d.virtualHeight()
-	return absX >= d.virtualOrigin.X && absX < d.virtualOrigin.X+virtW &&
-		absY >= d.virtualOrigin.Y && absY < d.virtualOrigin.Y+virtH
+	return absX >= d.origin.X && absX < d.origin.X+virtW &&
+		absY >= d.origin.Y && absY < d.origin.Y+virtH
 }
 
 // Move moves the mouse to the specified coordinates relative to this display.
@@ -209,7 +209,7 @@ func (d *Display) DragTo(x, y int, button string) {
 
 // Capture captures the entire display.
 func (d *Display) Capture() (*image.RGBA, error) {
-	return d.CaptureRect(0, 0, d.bounds.W, d.bounds.H)
+	return d.CaptureRect(0, 0, d.size.W, d.size.H)
 }
 
 // CaptureRect captures a rectangular region of this display.

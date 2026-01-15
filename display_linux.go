@@ -31,11 +31,9 @@ func MainDisplay() *Display {
 		id:     int(info.handle),
 		index:  int(info.index),
 		isMain: info.isMain != 0,
-		bounds: Rect{
-			Point: Point{X: int(info.x), Y: int(info.y)},
-			Size:  Size{W: int(info.w), H: int(info.h)},
-		},
-		scale: float64(info.scale),
+		origin: Point{X: int(info.x), Y: int(info.y)},
+		size:   Size{W: int(info.w), H: int(info.h)},
+		scale:  float64(info.scale),
 	}
 }
 
@@ -56,11 +54,9 @@ func AllDisplays() []*Display {
 			id:     int(info.handle),
 			index:  int(info.index),
 			isMain: info.isMain != 0,
-			bounds: Rect{
-				Point: Point{X: int(info.x), Y: int(info.y)},
-				Size:  Size{W: int(info.w), H: int(info.h)},
-			},
-			scale: float64(info.scale),
+			origin: Point{X: int(info.x), Y: int(info.y)},
+			size:   Size{W: int(info.w), H: int(info.h)},
+			scale:  float64(info.scale),
 		}
 	}
 
@@ -83,11 +79,9 @@ func DisplayAt(index int) *Display {
 		id:     int(info.handle),
 		index:  int(info.index),
 		isMain: info.isMain != 0,
-		bounds: Rect{
-			Point: Point{X: int(info.x), Y: int(info.y)},
-			Size:  Size{W: int(info.w), H: int(info.h)},
-		},
-		scale: float64(info.scale),
+		origin: Point{X: int(info.x), Y: int(info.y)},
+		size:   Size{W: int(info.w), H: int(info.h)},
+		scale:  float64(info.scale),
 	}
 }
 
@@ -99,7 +93,7 @@ func DisplayCount() int {
 // ToAbsolute converts coordinates relative to this display to absolute coordinates.
 // On Linux, both input and output are physical pixel coordinates.
 func (d *Display) ToAbsolute(x, y int) (absX, absY int) {
-	return d.bounds.X + x, d.bounds.Y + y
+	return d.origin.X + x, d.origin.Y + y
 }
 
 // ToRelative converts absolute coordinates to coordinates relative to this display.
@@ -109,14 +103,14 @@ func (d *Display) ToRelative(absX, absY int) (x, y int, ok bool) {
 	if !d.Contains(absX, absY) {
 		return 0, 0, false
 	}
-	return absX - d.bounds.X, absY - d.bounds.Y, true
+	return absX - d.origin.X, absY - d.origin.Y, true
 }
 
 // Contains checks if the specified absolute coordinate is within this display.
 // On Linux, coordinates are physical pixels.
 func (d *Display) Contains(absX, absY int) bool {
-	return absX >= d.bounds.X && absX < d.bounds.X+d.bounds.W &&
-		absY >= d.bounds.Y && absY < d.bounds.Y+d.bounds.H
+	return absX >= d.origin.X && absX < d.origin.X+d.size.W &&
+		absY >= d.origin.Y && absY < d.origin.Y+d.size.H
 }
 
 // Move moves the mouse to the specified coordinates relative to this display.
@@ -154,7 +148,7 @@ func (d *Display) DragTo(x, y int, button string) {
 
 // Capture captures the entire display.
 func (d *Display) Capture() (*image.RGBA, error) {
-	return d.CaptureRect(0, 0, d.bounds.W, d.bounds.H)
+	return d.CaptureRect(0, 0, d.size.W, d.size.H)
 }
 
 // CaptureRect captures a rectangular region of this display.

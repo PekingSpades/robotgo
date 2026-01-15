@@ -249,7 +249,8 @@ func GetScreenSize() (int, int) {
 
 // GetScreenRect get the main screen rect (x, y, w, h)
 func GetScreenRect() Rect {
-	return MainDisplay().Bounds()
+	d := MainDisplay()
+	return Rect{Point: d.Origin(), Size: d.Size()}
 }
 
 // CaptureScreen capture the screen return bitmap(c struct),

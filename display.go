@@ -21,17 +21,16 @@ var ErrCaptureScreen = errors.New("capture screen failed")
 // Display represents a physical display/monitor.
 //
 // Coordinate semantics:
-//   - bounds.X/Y: Physical position in desktop coordinate system
-//   - bounds.W/H: Physical pixel resolution
-//   - virtualOrigin: Virtual (logical) position (used when DPI awareness fails on Windows)
+//   - origin: Position in platform's coordinate system (virtual on macOS, physical on Windows/Linux)
+//   - size: Always physical pixel resolution
 //   - Move/Capture/etc: Accept physical pixel coordinates relative to this display
 type Display struct {
-	id            int     // Platform-specific display ID
-	index         int     // Display index (0 is main display)
-	isMain        bool    // Whether this is the main display
-	bounds        Rect    // Display bounds (X/Y: physical position, W/H: physical size)
-	virtualOrigin Point   // Virtual (logical) origin for coordinate conversion
-	scale         float64 // Scale factor (physical pixels / virtual points)
+	id     int     // Platform-specific display ID
+	index  int     // Display index (0 is main display)
+	isMain bool    // Whether this is the main display
+	origin Point   // Position in platform's coordinate system
+	size   Size    // Physical pixel size
+	scale  float64 // Scale factor (physical pixels / virtual points)
 }
 
 // DisplayInfo contains detailed information about a display.
@@ -39,7 +38,8 @@ type DisplayInfo struct {
 	ID          int     // Platform-specific ID
 	Index       int     // Index
 	IsMain      bool    // Whether this is the main display
-	Bounds      Rect    // Bounds
+	Origin      Point   // Position in platform's coordinate system
+	Size        Size    // Physical pixel size
 	ScaleFactor float64 // Scale factor
 }
 
@@ -61,26 +61,24 @@ func (d *Display) IsMain() bool {
 	return d.isMain
 }
 
-// Bounds returns the display bounds.
-// X/Y: Position in virtual desktop coordinate system
-// W/H: Physical pixel resolution
-func (d *Display) Bounds() Rect {
-	return d.bounds
+// Origin returns the display position in platform's coordinate system.
+func (d *Display) Origin() Point {
+	return d.origin
 }
 
 // Size returns the display physical pixel size.
 func (d *Display) Size() Size {
-	return d.bounds.Size
+	return d.size
 }
 
 // Width returns the display physical pixel width.
 func (d *Display) Width() int {
-	return d.bounds.W
+	return d.size.W
 }
 
 // Height returns the display physical pixel height.
 func (d *Display) Height() int {
-	return d.bounds.H
+	return d.size.H
 }
 
 // Scale returns the scale factor (physical pixels / virtual points).
@@ -97,7 +95,8 @@ func (d *Display) Info() DisplayInfo {
 		ID:          d.id,
 		Index:       d.index,
 		IsMain:      d.isMain,
-		Bounds:      d.bounds,
+		Origin:      d.origin,
+		Size:        d.size,
 		ScaleFactor: d.scale,
 	}
 }

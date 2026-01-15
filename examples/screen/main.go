@@ -53,8 +53,8 @@ func bitmap() {
 		robotgo.Save(img2, path2+".png")
 		robotgo.SaveJpeg(img2, path2+".jpeg", 50)
 
-		bounds := display.Bounds()
-		img3, err := display.CaptureRect(0, 0, bounds.W, bounds.H)
+		size := display.Size()
+		img3, err := display.CaptureRect(0, 0, size.W, size.H)
 		fmt.Println("Capture error: ", err)
 		robotgo.Save(img3, path2+"_1.png")
 	}

@@ -33,11 +33,9 @@ func MainDisplay() *Display {
 		id:     int(info.handle),
 		index:  int(info.index),
 		isMain: info.isMain != 0,
-		bounds: Rect{
-			Point: Point{X: int(info.x), Y: int(info.y)},
-			Size:  Size{W: int(info.w), H: int(info.h)},
-		},
-		scale: float64(info.scale),
+		origin: Point{X: int(info.x), Y: int(info.y)},
+		size:   Size{W: int(info.w), H: int(info.h)},
+		scale:  float64(info.scale),
 	}
 }
 
@@ -58,11 +56,9 @@ func AllDisplays() []*Display {
 			id:     int(info.handle),
 			index:  int(info.index),
 			isMain: info.isMain != 0,
-			bounds: Rect{
-				Point: Point{X: int(info.x), Y: int(info.y)},
-				Size:  Size{W: int(info.w), H: int(info.h)},
-			},
-			scale: float64(info.scale),
+			origin: Point{X: int(info.x), Y: int(info.y)},
+			size:   Size{W: int(info.w), H: int(info.h)},
+			scale:  float64(info.scale),
 		}
 	}
 
@@ -85,11 +81,9 @@ func DisplayAt(index int) *Display {
 		id:     int(info.handle),
 		index:  int(info.index),
 		isMain: info.isMain != 0,
-		bounds: Rect{
-			Point: Point{X: int(info.x), Y: int(info.y)},
-			Size:  Size{W: int(info.w), H: int(info.h)},
-		},
-		scale: float64(info.scale),
+		origin: Point{X: int(info.x), Y: int(info.y)},
+		size:   Size{W: int(info.w), H: int(info.h)},
+		scale:  float64(info.scale),
 	}
 }
 
@@ -101,17 +95,17 @@ func DisplayCount() int {
 // virtualWidth returns the virtual (point) width of the display.
 func (d *Display) virtualWidth() int {
 	if d.scale > 0 {
-		return int(float64(d.bounds.W) / d.scale)
+		return int(float64(d.size.W) / d.scale)
 	}
-	return d.bounds.W
+	return d.size.W
 }
 
 // virtualHeight returns the virtual (point) height of the display.
 func (d *Display) virtualHeight() int {
 	if d.scale > 0 {
-		return int(float64(d.bounds.H) / d.scale)
+		return int(float64(d.size.H) / d.scale)
 	}
-	return d.bounds.H
+	return d.size.H
 }
 
 // ToAbsolute converts physical pixel coordinates relative to this display
@@ -121,11 +115,11 @@ func (d *Display) virtualHeight() int {
 func (d *Display) ToAbsolute(physX, physY int) (virtAbsX, virtAbsY int) {
 	if d.scale > 0 {
 		// Convert physical to virtual relative, then add virtual origin
-		virtAbsX = d.bounds.X + int(float64(physX)/d.scale)
-		virtAbsY = d.bounds.Y + int(float64(physY)/d.scale)
+		virtAbsX = d.origin.X + int(float64(physX)/d.scale)
+		virtAbsY = d.origin.Y + int(float64(physY)/d.scale)
 	} else {
-		virtAbsX = d.bounds.X + physX
-		virtAbsY = d.bounds.Y + physY
+		virtAbsX = d.origin.X + physX
+		virtAbsY = d.origin.Y + physY
 	}
 	return
 }
@@ -140,8 +134,8 @@ func (d *Display) ToRelative(virtAbsX, virtAbsY int) (physX, physY int, ok bool)
 		return 0, 0, false
 	}
 	// Calculate virtual relative coordinates
-	virtRelX := virtAbsX - d.bounds.X
-	virtRelY := virtAbsY - d.bounds.Y
+	virtRelX := virtAbsX - d.origin.X
+	virtRelY := virtAbsY - d.origin.Y
 	// Convert to physical coordinates
 	if d.scale > 0 {
 		physX = int(float64(virtRelX) * d.scale)
@@ -158,8 +152,8 @@ func (d *Display) ToRelative(virtAbsX, virtAbsY int) (physX, physY int, ok bool)
 func (d *Display) Contains(virtAbsX, virtAbsY int) bool {
 	virtW := d.virtualWidth()
 	virtH := d.virtualHeight()
-	return virtAbsX >= d.bounds.X && virtAbsX < d.bounds.X+virtW &&
-		virtAbsY >= d.bounds.Y && virtAbsY < d.bounds.Y+virtH
+	return virtAbsX >= d.origin.X && virtAbsX < d.origin.X+virtW &&
+		virtAbsY >= d.origin.Y && virtAbsY < d.origin.Y+virtH
 }
 
 // Move moves the mouse to the specified physical pixel coordinates relative to this display.
@@ -197,7 +191,7 @@ func (d *Display) DragTo(physX, physY int, button string) {
 
 // Capture captures the entire display.
 func (d *Display) Capture() (*image.RGBA, error) {
-	return d.CaptureRect(0, 0, d.bounds.W, d.bounds.H)
+	return d.CaptureRect(0, 0, d.size.W, d.size.H)
 }
 
 // CaptureRect captures a rectangular region of this display.

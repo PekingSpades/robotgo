@@ -36,8 +36,8 @@ func main() {
 		fmt.Printf("Display #%d\n", info.Index)
 		fmt.Printf("  ID:       %d\n", info.ID)
 		fmt.Printf("  IsMain:   %v\n", info.IsMain)
-		fmt.Printf("  Position: (%d, %d)\n", info.Bounds.X, info.Bounds.Y)
-		fmt.Printf("  Size:     %d x %d\n", info.Bounds.W, info.Bounds.H)
+		fmt.Printf("  Position: (%d, %d)\n", info.Origin.X, info.Origin.Y)
+		fmt.Printf("  Size:     %d x %d\n", info.Size.W, info.Size.H)
 		fmt.Printf("  Scale:    %.2f\n", info.ScaleFactor)
 		fmt.Println("----------------------------------------")
 	}
@@ -56,9 +56,9 @@ func main() {
 
 	for _, d := range displays {
 		info := d.Info()
-		w, h := info.Bounds.W, info.Bounds.H
+		w, h := info.Size.W, info.Size.H
 		fmt.Printf("\nDisplay #%d (%dx%d) @ (%d,%d):\n",
-			info.Index, w, h, info.Bounds.X, info.Bounds.Y)
+			info.Index, w, h, info.Origin.X, info.Origin.Y)
 
 		// Define positions with 10px margin from edges
 		positions := []struct {

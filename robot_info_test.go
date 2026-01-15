@@ -65,8 +65,8 @@ func TestAllDisplaysInfo(t *testing.T) {
 		fmt.Printf("Display #%d\n", info.Index)
 		fmt.Printf("  ID:       %d\n", info.ID)
 		fmt.Printf("  IsMain:   %v\n", info.IsMain)
-		fmt.Printf("  Position: (%d, %d)\n", info.Bounds.X, info.Bounds.Y)
-		fmt.Printf("  Size:     %d x %d\n", info.Bounds.W, info.Bounds.H)
+		fmt.Printf("  Position: (%d, %d)\n", info.Origin.X, info.Origin.Y)
+		fmt.Printf("  Size:     %d x %d\n", info.Size.W, info.Size.H)
 		fmt.Printf("  Scale:    %.2f\n", info.ScaleFactor)
 		fmt.Println("----------------------------------------")
 	}
@@ -83,8 +83,8 @@ func TestDisplayMoveCorners(t *testing.T) {
 
 	for _, d := range displays {
 		info := d.Info()
-		w, h := info.Bounds.W, info.Bounds.H
-		fmt.Printf("\nDisplay #%d (%dx%d) @ (%d,%d):\n", info.Index, w, h, info.Bounds.X, info.Bounds.Y)
+		w, h := info.Size.W, info.Size.H
+		fmt.Printf("\nDisplay #%d (%dx%d) @ (%d,%d):\n", info.Index, w, h, info.Origin.X, info.Origin.Y)
 
 		// Define corners and center positions (relative to display)
 		positions := []struct {
@@ -131,8 +131,8 @@ func TestMousePositionMonitor(t *testing.T) {
 		info := d.Info()
 		fmt.Printf("Display #%d: ID=%d, IsMain=%v, Position=(%d,%d), Size=%dx%d, Scale=%.2f\n",
 			info.Index, info.ID, info.IsMain,
-			info.Bounds.X, info.Bounds.Y,
-			info.Bounds.W, info.Bounds.H,
+			info.Origin.X, info.Origin.Y,
+			info.Size.W, info.Size.H,
 			info.ScaleFactor)
 	}
 	fmt.Println("=================================")
