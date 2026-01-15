@@ -18,6 +18,16 @@ import (
 // ErrCaptureScreen is returned when screen capture fails.
 var ErrCaptureScreen = errors.New("capture screen failed")
 
+// ErrInvalidPlatformInfo is returned when platform info is missing or invalid.
+var ErrInvalidPlatformInfo = errors.New("invalid platform info")
+
+// PlatformInfo is an interface for platform-specific display information.
+// Each platform can implement this interface to store custom data.
+type PlatformInfo interface {
+	// Platform returns the platform name (e.g., "windows", "darwin", "linux")
+	Platform() string
+}
+
 // Display represents a physical display/monitor.
 //
 // Coordinate semantics:
@@ -25,12 +35,13 @@ var ErrCaptureScreen = errors.New("capture screen failed")
 //   - size: Physical pixel resolution
 //   - Move/Capture/etc: Accept physical pixel coordinates relative to this display
 type Display struct {
-	id     int     // Platform-specific display ID
-	index  int     // Display index (0 is main display)
-	isMain bool    // Whether this is the main display
-	origin Rect    // Bounds in platform's coordinate system (position + logical size)
-	size   Size    // Physical pixel size
-	scale  float64 // Scale factor (physical pixels / virtual points)
+	id       int          // Platform-specific display ID
+	index    int          // Display index (0 is main display)
+	isMain   bool         // Whether this is the main display
+	origin   Rect         // Bounds in platform's coordinate system (position + logical size)
+	size     Size         // Physical pixel size
+	scale    float64      // Scale factor (physical pixels / virtual points)
+	platform PlatformInfo // Platform-specific information (nil if not set)
 }
 
 // DisplayInfo contains detailed information about a display.
@@ -88,6 +99,17 @@ func (d *Display) Height() int {
 //   - Linux: Xft.dpi / 96.0
 func (d *Display) Scale() float64 {
 	return d.scale
+}
+
+// GetPlatformInfo returns the platform-specific information.
+// Returns nil if no platform-specific info is set.
+// Use type assertion to access platform-specific fields:
+//
+//	if info, ok := d.GetPlatformInfo().(*WindowsPlatformInfo); ok {
+//	    // access Windows-specific fields
+//	}
+func (d *Display) GetPlatformInfo() PlatformInfo {
+	return d.platform
 }
 
 // Info returns detailed display information.

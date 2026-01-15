@@ -23,6 +23,21 @@ import "C"
 
 import "image"
 
+// WindowsPlatformInfo contains Windows-specific display information.
+// This struct stores physical coordinates that are always available
+// regardless of DPI awareness mode.
+type WindowsPlatformInfo struct {
+	// PhysicalOrigin is the top-left corner in physical pixel coordinates.
+	// This is always the physical position, regardless of DPI awareness mode.
+	// Use this for screen capture operations which always use physical coordinates.
+	PhysicalOrigin Point
+}
+
+// Platform returns the platform name.
+func (w *WindowsPlatformInfo) Platform() string {
+	return "windows"
+}
+
 // MainDisplay returns the main display.
 func MainDisplay() *Display {
 	info := C.getMainDisplay()
@@ -35,6 +50,9 @@ func MainDisplay() *Display {
 		logicalW = int(float64(physW) / scale)
 		logicalH = int(float64(physH) / scale)
 	}
+
+	// Always store physical origin for capture operations
+	physicalOrigin := Point{X: int(info.x), Y: int(info.y)}
 
 	var origin Rect
 	if dpiAware {
@@ -58,6 +76,9 @@ func MainDisplay() *Display {
 		origin: origin,
 		size:   Size{W: physW, H: physH},
 		scale:  scale,
+		platform: &WindowsPlatformInfo{
+			PhysicalOrigin: physicalOrigin,
+		},
 	}
 }
 
@@ -83,6 +104,9 @@ func AllDisplays() []*Display {
 			logicalH = int(float64(physH) / scale)
 		}
 
+		// Always store physical origin for capture operations
+		physicalOrigin := Point{X: int(info.x), Y: int(info.y)}
+
 		var origin Rect
 		if dpiAware {
 			origin = Rect{
@@ -103,6 +127,9 @@ func AllDisplays() []*Display {
 			origin: origin,
 			size:   Size{W: physW, H: physH},
 			scale:  scale,
+			platform: &WindowsPlatformInfo{
+				PhysicalOrigin: physicalOrigin,
+			},
 		}
 	}
 
@@ -130,6 +157,9 @@ func DisplayAt(index int) *Display {
 		logicalH = int(float64(physH) / scale)
 	}
 
+	// Always store physical origin for capture operations
+	physicalOrigin := Point{X: int(info.x), Y: int(info.y)}
+
 	var origin Rect
 	if dpiAware {
 		origin = Rect{
@@ -150,6 +180,9 @@ func DisplayAt(index int) *Display {
 		origin: origin,
 		size:   Size{W: physW, H: physH},
 		scale:  scale,
+		platform: &WindowsPlatformInfo{
+			PhysicalOrigin: physicalOrigin,
+		},
 	}
 }
 
@@ -246,19 +279,15 @@ func (d *Display) Capture() (*image.RGBA, error) {
 
 // CaptureRect captures a rectangular region of this display.
 // Coordinates and size are in physical pixels relative to this display.
+// Always uses physical coordinates for capture, regardless of DPI awareness mode.
 func (d *Display) CaptureRect(physX, physY, w, h int) (*image.RGBA, error) {
-	absX, absY := d.ToAbsolute(physX, physY)
-	if dpiAware {
-		return Capture(absX, absY, w, h)
+	pi, ok := d.platform.(*WindowsPlatformInfo)
+	if !ok {
+		return nil, ErrInvalidPlatformInfo
 	}
-	// DPI unaware: convert physical size to virtual size
-	virtW := w
-	virtH := h
-	if d.scale > 0 {
-		virtW = int(float64(w) / d.scale)
-		virtH = int(float64(h) / d.scale)
-	}
-	return Capture(absX, absY, virtW, virtH)
+	absX := pi.PhysicalOrigin.X + physX
+	absY := pi.PhysicalOrigin.Y + physY
+	return Capture(absX, absY, w, h)
 }
 
 // GetPixelColor gets the pixel color at the specified coordinates relative to this display.
