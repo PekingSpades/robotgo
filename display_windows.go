@@ -26,18 +26,38 @@ import "image"
 // MainDisplay returns the main display.
 func MainDisplay() *Display {
 	info := C.getMainDisplay()
-	origin := Point{X: int(info.x), Y: int(info.y)}
-	if !dpiAware {
-		// When DPI unaware, use virtual coordinates as origin
-		origin = Point{X: int(info.vx), Y: int(info.vy)}
+	scale := float64(info.scale)
+	physW, physH := int(info.w), int(info.h)
+
+	// Calculate logical size
+	logicalW, logicalH := physW, physH
+	if scale > 0 {
+		logicalW = int(float64(physW) / scale)
+		logicalH = int(float64(physH) / scale)
 	}
+
+	var origin Rect
+	if dpiAware {
+		// DPI aware: use physical coordinates and size
+		origin = Rect{
+			Point: Point{X: int(info.x), Y: int(info.y)},
+			Size:  Size{W: physW, H: physH},
+		}
+	} else {
+		// DPI unaware: use virtual coordinates and logical size
+		origin = Rect{
+			Point: Point{X: int(info.vx), Y: int(info.vy)},
+			Size:  Size{W: logicalW, H: logicalH},
+		}
+	}
+
 	return &Display{
 		id:     int(info.handle),
 		index:  int(info.index),
 		isMain: info.isMain != 0,
 		origin: origin,
-		size:   Size{W: int(info.w), H: int(info.h)},
-		scale:  float64(info.scale),
+		size:   Size{W: physW, H: physH},
+		scale:  scale,
 	}
 }
 
@@ -54,17 +74,35 @@ func AllDisplays() []*Display {
 	displays := make([]*Display, actualCount)
 	for i := 0; i < actualCount; i++ {
 		info := cDisplays[i]
-		origin := Point{X: int(info.x), Y: int(info.y)}
-		if !dpiAware {
-			origin = Point{X: int(info.vx), Y: int(info.vy)}
+		scale := float64(info.scale)
+		physW, physH := int(info.w), int(info.h)
+
+		logicalW, logicalH := physW, physH
+		if scale > 0 {
+			logicalW = int(float64(physW) / scale)
+			logicalH = int(float64(physH) / scale)
 		}
+
+		var origin Rect
+		if dpiAware {
+			origin = Rect{
+				Point: Point{X: int(info.x), Y: int(info.y)},
+				Size:  Size{W: physW, H: physH},
+			}
+		} else {
+			origin = Rect{
+				Point: Point{X: int(info.vx), Y: int(info.vy)},
+				Size:  Size{W: logicalW, H: logicalH},
+			}
+		}
+
 		displays[i] = &Display{
 			id:     int(info.handle),
 			index:  int(info.index),
 			isMain: info.isMain != 0,
 			origin: origin,
-			size:   Size{W: int(info.w), H: int(info.h)},
-			scale:  float64(info.scale),
+			size:   Size{W: physW, H: physH},
+			scale:  scale,
 		}
 	}
 
@@ -83,39 +121,41 @@ func DisplayAt(index int) *Display {
 		return nil
 	}
 
-	origin := Point{X: int(info.x), Y: int(info.y)}
-	if !dpiAware {
-		origin = Point{X: int(info.vx), Y: int(info.vy)}
+	scale := float64(info.scale)
+	physW, physH := int(info.w), int(info.h)
+
+	logicalW, logicalH := physW, physH
+	if scale > 0 {
+		logicalW = int(float64(physW) / scale)
+		logicalH = int(float64(physH) / scale)
 	}
+
+	var origin Rect
+	if dpiAware {
+		origin = Rect{
+			Point: Point{X: int(info.x), Y: int(info.y)},
+			Size:  Size{W: physW, H: physH},
+		}
+	} else {
+		origin = Rect{
+			Point: Point{X: int(info.vx), Y: int(info.vy)},
+			Size:  Size{W: logicalW, H: logicalH},
+		}
+	}
+
 	return &Display{
 		id:     int(info.handle),
 		index:  int(info.index),
 		isMain: info.isMain != 0,
 		origin: origin,
-		size:   Size{W: int(info.w), H: int(info.h)},
-		scale:  float64(info.scale),
+		size:   Size{W: physW, H: physH},
+		scale:  scale,
 	}
 }
 
 // DisplayCount returns the number of displays.
 func DisplayCount() int {
 	return int(C.getDisplayCount())
-}
-
-// virtualWidth returns the virtual (logical) width of the display.
-func (d *Display) virtualWidth() int {
-	if d.scale > 0 {
-		return int(float64(d.size.W) / d.scale)
-	}
-	return d.size.W
-}
-
-// virtualHeight returns the virtual (logical) height of the display.
-func (d *Display) virtualHeight() int {
-	if d.scale > 0 {
-		return int(float64(d.size.H) / d.scale)
-	}
-	return d.size.H
 }
 
 // ToAbsolute converts physical pixel coordinates relative to this display
@@ -162,16 +202,8 @@ func (d *Display) ToRelative(absX, absY int) (physX, physY int, ok bool) {
 
 // Contains checks if the specified absolute coordinate is within this display.
 func (d *Display) Contains(absX, absY int) bool {
-	if dpiAware {
-		// DPI aware: use physical size
-		return absX >= d.origin.X && absX < d.origin.X+d.size.W &&
-			absY >= d.origin.Y && absY < d.origin.Y+d.size.H
-	}
-	// DPI unaware: use virtual size
-	virtW := d.virtualWidth()
-	virtH := d.virtualHeight()
-	return absX >= d.origin.X && absX < d.origin.X+virtW &&
-		absY >= d.origin.Y && absY < d.origin.Y+virtH
+	return absX >= d.origin.X && absX < d.origin.X+d.origin.W &&
+		absY >= d.origin.Y && absY < d.origin.Y+d.origin.H
 }
 
 // Move moves the mouse to the specified coordinates relative to this display.

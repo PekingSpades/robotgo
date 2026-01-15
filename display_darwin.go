@@ -29,13 +29,26 @@ import "image"
 // MainDisplay returns the main display.
 func MainDisplay() *Display {
 	info := C.getMainDisplay()
+	scale := float64(info.scale)
+	physW, physH := int(info.w), int(info.h)
+
+	// Calculate logical size for origin
+	logicalW, logicalH := physW, physH
+	if scale > 0 {
+		logicalW = int(float64(physW) / scale)
+		logicalH = int(float64(physH) / scale)
+	}
+
 	return &Display{
 		id:     int(info.handle),
 		index:  int(info.index),
 		isMain: info.isMain != 0,
-		origin: Point{X: int(info.x), Y: int(info.y)},
-		size:   Size{W: int(info.w), H: int(info.h)},
-		scale:  float64(info.scale),
+		origin: Rect{
+			Point: Point{X: int(info.x), Y: int(info.y)},
+			Size:  Size{W: logicalW, H: logicalH},
+		},
+		size:  Size{W: physW, H: physH},
+		scale: scale,
 	}
 }
 
@@ -52,13 +65,25 @@ func AllDisplays() []*Display {
 	displays := make([]*Display, actualCount)
 	for i := 0; i < actualCount; i++ {
 		info := cDisplays[i]
+		scale := float64(info.scale)
+		physW, physH := int(info.w), int(info.h)
+
+		logicalW, logicalH := physW, physH
+		if scale > 0 {
+			logicalW = int(float64(physW) / scale)
+			logicalH = int(float64(physH) / scale)
+		}
+
 		displays[i] = &Display{
 			id:     int(info.handle),
 			index:  int(info.index),
 			isMain: info.isMain != 0,
-			origin: Point{X: int(info.x), Y: int(info.y)},
-			size:   Size{W: int(info.w), H: int(info.h)},
-			scale:  float64(info.scale),
+			origin: Rect{
+				Point: Point{X: int(info.x), Y: int(info.y)},
+				Size:  Size{W: logicalW, H: logicalH},
+			},
+			size:  Size{W: physW, H: physH},
+			scale: scale,
 		}
 	}
 
@@ -77,35 +102,31 @@ func DisplayAt(index int) *Display {
 		return nil
 	}
 
+	scale := float64(info.scale)
+	physW, physH := int(info.w), int(info.h)
+
+	logicalW, logicalH := physW, physH
+	if scale > 0 {
+		logicalW = int(float64(physW) / scale)
+		logicalH = int(float64(physH) / scale)
+	}
+
 	return &Display{
 		id:     int(info.handle),
 		index:  int(info.index),
 		isMain: info.isMain != 0,
-		origin: Point{X: int(info.x), Y: int(info.y)},
-		size:   Size{W: int(info.w), H: int(info.h)},
-		scale:  float64(info.scale),
+		origin: Rect{
+			Point: Point{X: int(info.x), Y: int(info.y)},
+			Size:  Size{W: logicalW, H: logicalH},
+		},
+		size:  Size{W: physW, H: physH},
+		scale: scale,
 	}
 }
 
 // DisplayCount returns the number of displays.
 func DisplayCount() int {
 	return int(C.getDisplayCount())
-}
-
-// virtualWidth returns the virtual (point) width of the display.
-func (d *Display) virtualWidth() int {
-	if d.scale > 0 {
-		return int(float64(d.size.W) / d.scale)
-	}
-	return d.size.W
-}
-
-// virtualHeight returns the virtual (point) height of the display.
-func (d *Display) virtualHeight() int {
-	if d.scale > 0 {
-		return int(float64(d.size.H) / d.scale)
-	}
-	return d.size.H
 }
 
 // ToAbsolute converts physical pixel coordinates relative to this display
@@ -150,10 +171,8 @@ func (d *Display) ToRelative(virtAbsX, virtAbsY int) (physX, physY int, ok bool)
 // Contains checks if the specified virtual absolute coordinate is within this display.
 // Input: virtual absolute coordinates
 func (d *Display) Contains(virtAbsX, virtAbsY int) bool {
-	virtW := d.virtualWidth()
-	virtH := d.virtualHeight()
-	return virtAbsX >= d.origin.X && virtAbsX < d.origin.X+virtW &&
-		virtAbsY >= d.origin.Y && virtAbsY < d.origin.Y+virtH
+	return virtAbsX >= d.origin.X && virtAbsX < d.origin.X+d.origin.W &&
+		virtAbsY >= d.origin.Y && virtAbsY < d.origin.Y+d.origin.H
 }
 
 // Move moves the mouse to the specified physical pixel coordinates relative to this display.

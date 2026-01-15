@@ -27,13 +27,17 @@ import "image"
 // MainDisplay returns the main display.
 func MainDisplay() *Display {
 	info := C.getMainDisplay()
+	physW, physH := int(info.w), int(info.h)
 	return &Display{
 		id:     int(info.handle),
 		index:  int(info.index),
 		isMain: info.isMain != 0,
-		origin: Point{X: int(info.x), Y: int(info.y)},
-		size:   Size{W: int(info.w), H: int(info.h)},
-		scale:  float64(info.scale),
+		origin: Rect{
+			Point: Point{X: int(info.x), Y: int(info.y)},
+			Size:  Size{W: physW, H: physH},
+		},
+		size:  Size{W: physW, H: physH},
+		scale: float64(info.scale),
 	}
 }
 
@@ -50,13 +54,17 @@ func AllDisplays() []*Display {
 	displays := make([]*Display, actualCount)
 	for i := 0; i < actualCount; i++ {
 		info := cDisplays[i]
+		physW, physH := int(info.w), int(info.h)
 		displays[i] = &Display{
 			id:     int(info.handle),
 			index:  int(info.index),
 			isMain: info.isMain != 0,
-			origin: Point{X: int(info.x), Y: int(info.y)},
-			size:   Size{W: int(info.w), H: int(info.h)},
-			scale:  float64(info.scale),
+			origin: Rect{
+				Point: Point{X: int(info.x), Y: int(info.y)},
+				Size:  Size{W: physW, H: physH},
+			},
+			size:  Size{W: physW, H: physH},
+			scale: float64(info.scale),
 		}
 	}
 
@@ -75,13 +83,17 @@ func DisplayAt(index int) *Display {
 		return nil
 	}
 
+	physW, physH := int(info.w), int(info.h)
 	return &Display{
 		id:     int(info.handle),
 		index:  int(info.index),
 		isMain: info.isMain != 0,
-		origin: Point{X: int(info.x), Y: int(info.y)},
-		size:   Size{W: int(info.w), H: int(info.h)},
-		scale:  float64(info.scale),
+		origin: Rect{
+			Point: Point{X: int(info.x), Y: int(info.y)},
+			Size:  Size{W: physW, H: physH},
+		},
+		size:  Size{W: physW, H: physH},
+		scale: float64(info.scale),
 	}
 }
 
@@ -109,8 +121,8 @@ func (d *Display) ToRelative(absX, absY int) (x, y int, ok bool) {
 // Contains checks if the specified absolute coordinate is within this display.
 // On Linux, coordinates are physical pixels.
 func (d *Display) Contains(absX, absY int) bool {
-	return absX >= d.origin.X && absX < d.origin.X+d.size.W &&
-		absY >= d.origin.Y && absY < d.origin.Y+d.size.H
+	return absX >= d.origin.X && absX < d.origin.X+d.origin.W &&
+		absY >= d.origin.Y && absY < d.origin.Y+d.origin.H
 }
 
 // Move moves the mouse to the specified coordinates relative to this display.

@@ -65,8 +65,9 @@ func TestAllDisplaysInfo(t *testing.T) {
 		fmt.Printf("Display #%d\n", info.Index)
 		fmt.Printf("  ID:       %d\n", info.ID)
 		fmt.Printf("  IsMain:   %v\n", info.IsMain)
-		fmt.Printf("  Position: (%d, %d)\n", info.Origin.X, info.Origin.Y)
-		fmt.Printf("  Size:     %d x %d\n", info.Size.W, info.Size.H)
+		fmt.Printf("  Origin:   {X: %d, Y: %d, W: %d, H: %d}\n",
+			info.Origin.X, info.Origin.Y, info.Origin.W, info.Origin.H)
+		fmt.Printf("  Size:     {W: %d, H: %d}\n", info.Size.W, info.Size.H)
 		fmt.Printf("  Scale:    %.2f\n", info.ScaleFactor)
 		fmt.Println("----------------------------------------")
 	}

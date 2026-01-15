@@ -21,14 +21,14 @@ var ErrCaptureScreen = errors.New("capture screen failed")
 // Display represents a physical display/monitor.
 //
 // Coordinate semantics:
-//   - origin: Position in platform's coordinate system (virtual on macOS, physical on Windows/Linux)
-//   - size: Always physical pixel resolution
+//   - origin: Bounds in platform's coordinate system (position + logical size)
+//   - size: Physical pixel resolution
 //   - Move/Capture/etc: Accept physical pixel coordinates relative to this display
 type Display struct {
 	id     int     // Platform-specific display ID
 	index  int     // Display index (0 is main display)
 	isMain bool    // Whether this is the main display
-	origin Point   // Position in platform's coordinate system
+	origin Rect    // Bounds in platform's coordinate system (position + logical size)
 	size   Size    // Physical pixel size
 	scale  float64 // Scale factor (physical pixels / virtual points)
 }
@@ -38,7 +38,7 @@ type DisplayInfo struct {
 	ID          int     // Platform-specific ID
 	Index       int     // Index
 	IsMain      bool    // Whether this is the main display
-	Origin      Point   // Position in platform's coordinate system
+	Origin      Rect    // Bounds in platform's coordinate system
 	Size        Size    // Physical pixel size
 	ScaleFactor float64 // Scale factor
 }
@@ -61,8 +61,9 @@ func (d *Display) IsMain() bool {
 	return d.isMain
 }
 
-// Origin returns the display position in platform's coordinate system.
-func (d *Display) Origin() Point {
+// Origin returns the display bounds in platform's coordinate system.
+// X/Y: Position, W/H: Logical size (for mouse operations)
+func (d *Display) Origin() Rect {
 	return d.origin
 }
 
