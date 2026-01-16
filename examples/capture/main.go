@@ -12,10 +12,13 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"image"
 	"image/color"
+	"os"
 	"runtime"
+	"strings"
 
 	"github.com/go-vgo/robotgo"
 	"golang.org/x/image/draw"
@@ -150,6 +153,37 @@ func main() {
 	fmt.Println("\n========================================")
 	fmt.Println("Done!")
 	fmt.Println("========================================")
+
+	// Collect log for potential saving
+	var logBuilder strings.Builder
+	logBuilder.WriteString("RobotGo Capture Example\n")
+	logBuilder.WriteString(fmt.Sprintf("Go version: %s\n", runtime.Version()))
+	logBuilder.WriteString(fmt.Sprintf("OS/Arch: %s/%s\n", runtime.GOOS, runtime.GOARCH))
+	logBuilder.WriteString(fmt.Sprintf("Total displays: %d\n", count))
+	for _, d := range displays {
+		info := d.Info()
+		logBuilder.WriteString(fmt.Sprintf("Display #%d: ID=%d, IsMain=%v, Origin=(%d,%d,%d,%d), Size=%dx%d, Scale=%.2f\n",
+			info.Index, info.ID, info.IsMain, info.Origin.X, info.Origin.Y, info.Origin.W, info.Origin.H, info.Size.W, info.Size.H, info.ScaleFactor))
+	}
+	logBuilder.WriteString(fmt.Sprintf("Overview canvas: %dx%d\n", canvasWidth, canvasHeight))
+
+	fmt.Println("\nPress 's' to save log and exit, or 'e' to exit directly:")
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(strings.ToLower(input))
+		if input == "s" {
+			if err := os.WriteFile("capture_log.txt", []byte(logBuilder.String()), 0644); err != nil {
+				fmt.Printf("Failed to save log: %v\n", err)
+			} else {
+				fmt.Println("Log saved to capture_log.txt")
+			}
+			break
+		} else if input == "e" {
+			break
+		}
+		fmt.Println("Press 's' to save log and exit, or 'e' to exit directly:")
+	}
 }
 
 // drawDisplayInfo draws display information at the bottom-right corner of a display area

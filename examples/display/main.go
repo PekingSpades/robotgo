@@ -12,8 +12,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"runtime"
+	"strings"
 
 	"github.com/go-vgo/robotgo"
 )
@@ -53,7 +56,7 @@ func main() {
 	fmt.Println("Moving mouse to each display's corners")
 	fmt.Println("========================================")
 
-	margin := 10
+	margin := 32
 
 	for _, d := range displays {
 		info := d.Info()
@@ -93,4 +96,34 @@ func main() {
 	fmt.Println("\n========================================")
 	fmt.Println("Done!")
 	fmt.Println("========================================")
+
+	// Collect all output for potential saving
+	var logBuilder strings.Builder
+	logBuilder.WriteString("RobotGo Display Example\n")
+	logBuilder.WriteString(fmt.Sprintf("Go version: %s\n", runtime.Version()))
+	logBuilder.WriteString(fmt.Sprintf("OS/Arch: %s/%s\n", runtime.GOOS, runtime.GOARCH))
+	logBuilder.WriteString(fmt.Sprintf("Total displays: %d\n", count))
+	for _, d := range displays {
+		info := d.Info()
+		logBuilder.WriteString(fmt.Sprintf("Display #%d: ID=%d, IsMain=%v, Origin=(%d,%d,%d,%d), Size=%dx%d, Scale=%.2f\n",
+			info.Index, info.ID, info.IsMain, info.Origin.X, info.Origin.Y, info.Origin.W, info.Origin.H, info.Size.W, info.Size.H, info.ScaleFactor))
+	}
+
+	fmt.Println("\nPress 's' to save log and exit, or 'e' to exit directly:")
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(strings.ToLower(input))
+		if input == "s" {
+			if err := os.WriteFile("display_log.txt", []byte(logBuilder.String()), 0644); err != nil {
+				fmt.Printf("Failed to save log: %v\n", err)
+			} else {
+				fmt.Println("Log saved to display_log.txt")
+			}
+			break
+		} else if input == "e" {
+			break
+		}
+		fmt.Println("Press 's' to save log and exit, or 'e' to exit directly:")
+	}
 }
