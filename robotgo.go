@@ -685,7 +685,7 @@ func ClickV1(args ...interface{}) {
 	if !double {
 		C.clickMouse(button)
 	} else {
-		C.doubleClick(button)
+		C.doubleClick(button, 2)
 	}
 
 	MilliSleep(MouseSleep)
@@ -735,7 +735,7 @@ func Click(args ...interface{}) error {
 			return formatClickError(int(code), button, "up", count)
 		}
 	} else {
-		if code := C.doubleClick(button); code != 0 {
+		if code := C.doubleClick(button, 2); code != 0 {
 			return formatClickError(int(code), button, "double", 2)
 		}
 	}
@@ -745,12 +745,17 @@ func Click(args ...interface{}) error {
 // MultiClick performs multiple clicks and returns error
 //
 // robotgo.MultiClick(button string, count int)
-func MultiClick(button string, count int) error {
+func MultiClick(button string, count int, click ...bool) error {
 	if count < 1 {
 		return nil
 	}
 	btn := CheckMouse(button)
 	defer MilliSleep(MouseSleep)
+
+	if runtime.GOOS == "darwin" && len(click) <= 0 {
+		code := C.doubleClick(btn, C.int(count))
+		return formatClickError(int(code), btn, "down", count)
+	}
 
 	for i := 0; i < count; i++ {
 		if err := Click(btn, false, count); err != nil {
@@ -761,6 +766,9 @@ func MultiClick(button string, count int) error {
 }
 
 func formatClickError(code int, button C.MMMouseButton, stage string, count int) error {
+	if code == 0 {
+		return nil
+	}
 	btnName := MouseButtonString(button)
 	detail := ""
 
@@ -840,15 +848,12 @@ func Toggle(key ...interface{}) error {
 	if len(key) > 1 && key[1].(string) == "up" {
 		down = false
 	}
-	code := C.toggleMouse(C.bool(down), button)
-	if code != 0 {
-		return formatClickError(int(code), button, "down", 1)
-	}
 
+	code := C.toggleMouse(C.bool(down), button)
 	if len(key) > 2 {
 		MilliSleep(MouseSleep)
 	}
-	return nil
+	return formatClickError(int(code), button, "down", 1)
 }
 
 // MouseDown send mouse down event

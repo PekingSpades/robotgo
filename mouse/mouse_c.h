@@ -201,7 +201,7 @@ int clickMouse(MMMouseButton button){
 }
 
 /* Special function for sending double clicks, needed for MacOS. */
-int doubleClick(MMMouseButton button){
+int doubleClick(MMMouseButton button, int count){
 	#if defined(IS_MACOSX)
 		/* Double click for Mac. */
 		const CGPoint currentPos = CGPointFromMMPointInt32(location());
@@ -216,7 +216,7 @@ int doubleClick(MMMouseButton button){
 		}
 
 		/* Set event to double click. */
-		CGEventSetIntegerValueField(event, kCGMouseEventClickState, 2);
+		CGEventSetIntegerValueField(event, kCGMouseEventClickState, count);
 		CGEventPost(kCGHIDEventTap, event);
 
 		CGEventSetType(event, mouseTypeUP);
