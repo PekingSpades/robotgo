@@ -721,8 +721,8 @@ func Click(args ...interface{}) error {
 		}
 		double = dbl
 	}
-	if len(args) > 3 {
-		count = args[3].(int)
+	if len(args) > 2 {
+		count = args[2].(int)
 	}
 
 	defer MilliSleep(MouseSleep)
@@ -758,7 +758,7 @@ func MultiClick(button string, count int, click ...bool) error {
 	}
 
 	for i := 0; i < count; i++ {
-		if err := Click(btn, false, count); err != nil {
+		if err := Click(btn, false, i+1); err != nil {
 			return err
 		}
 	}
