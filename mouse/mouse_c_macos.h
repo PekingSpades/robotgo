@@ -126,20 +126,37 @@ int multiClickErr(MMMouseButton button, int clickCount){
 	const CGEventType mouseTypeUP = MMMouseToCGEventType(false, button);
 
 	CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
-	CGEventRef event = CGEventCreateMouseEvent(source, mouseTypeDown, currentPos, (CGMouseButton)button);
-
-	if (event == NULL) {
-		CFRelease(source);
+	if (source == NULL) {
 		return (int)kCGErrorCannotComplete;
 	}
 
-	CGEventSetIntegerValueField(event, kCGMouseEventClickState, clickCount);
-	CGEventPost(kCGHIDEventTap, event);
+	int i;
+	for (i = 0; i < clickCount; i++) {
+		CGEventRef down = CGEventCreateMouseEvent(source, mouseTypeDown, currentPos, (CGMouseButton)button);
+		if (down == NULL) {
+			CFRelease(source);
+			return (int)kCGErrorCannotComplete;
+		}
+		CGEventSetIntegerValueField(down, kCGMouseEventClickState, i + 1);
+		CGEventPost(kCGHIDEventTap, down);
+		CFRelease(down);
 
-	CGEventSetType(event, mouseTypeUP);
-	CGEventPost(kCGHIDEventTap, event);
+		microsleep(5.0);
 
-	CFRelease(event);
+		CGEventRef up = CGEventCreateMouseEvent(source, mouseTypeUP, currentPos, (CGMouseButton)button);
+		if (up == NULL) {
+			CFRelease(source);
+			return (int)kCGErrorCannotComplete;
+		}
+		CGEventSetIntegerValueField(up, kCGMouseEventClickState, i + 1);
+		CGEventPost(kCGHIDEventTap, up);
+		CFRelease(up);
+
+		if (i < clickCount - 1) {
+			microsleep(200);
+		}
+	}
+
 	CFRelease(source);
 
 	return 0;
