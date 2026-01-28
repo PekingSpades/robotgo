@@ -36,21 +36,25 @@ func bitmap() {
 	fmt.Println("error: ", err)
 	robotgo.Save(img, "save.png")
 
-	num := robotgo.DisplaysNum()
+	num := robotgo.DisplayCount()
 	for i := 0; i < num; i++ {
-		robotgo.DisplayID = i
-		img1, _ := robotgo.CaptureImg()
+		display := robotgo.DisplayAt(i)
+		if display == nil {
+			continue
+		}
+
+		img1, _ := display.Capture()
 		path1 := "save_" + strconv.Itoa(i)
 		robotgo.Save(img1, path1+".png")
 		robotgo.SaveJpeg(img1, path1+".jpeg", 50)
 
-		img2, _ := robotgo.CaptureImg(10, 10, 20, 20)
+		img2, _ := display.CaptureRect(10, 10, 20, 20)
 		path2 := "test_" + strconv.Itoa(i)
 		robotgo.Save(img2, path2+".png")
 		robotgo.SaveJpeg(img2, path2+".jpeg", 50)
 
-		x, y, w, h := robotgo.GetDisplayBounds(i)
-		img3, err := robotgo.CaptureImg(x, y, w, h)
+		size := display.Size()
+		img3, err := display.CaptureRect(0, 0, size.W, size.H)
 		fmt.Println("Capture error: ", err)
 		robotgo.Save(img3, path2+"_1.png")
 	}
@@ -90,12 +94,12 @@ func screen() {
 	// gets the screen width and height
 	sx, sy := robotgo.GetScreenSize()
 	fmt.Println("get screen size: ", sx, sy)
-	for i := 0; i < robotgo.DisplaysNum(); i++ {
-		s1 := robotgo.ScaleF(i)
-		fmt.Println("ScaleF: ", s1)
+	for i := 0; i < robotgo.DisplayCount(); i++ {
+		display := robotgo.DisplayAt(i)
+		if display != nil {
+			fmt.Println("Display", i, "Scale:", display.Scale())
+		}
 	}
-	sx, sy = robotgo.GetScaleSize()
-	fmt.Println("get screen scale size: ", sx, sy)
 
 	color()
 }

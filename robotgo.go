@@ -75,13 +75,8 @@ var (
 	// KeySleep set the key default millisecond sleep time
 	KeySleep = 10
 
-	// DisplayID set the screen display id
-	DisplayID = -1
-
 	// NotPid used the hwnd not pid in windows
 	NotPid bool
-	// Scale option the os screen scale
-	Scale bool
 )
 
 type (
@@ -213,41 +208,28 @@ func RgbToHex(r, g, b uint8) C.uint32_t {
 }
 
 // GetPxColor get the pixel color return C.MMRGBHex
-func GetPxColor(x, y int, displayId ...int) C.MMRGBHex {
+func GetPxColor(x, y int) C.MMRGBHex {
 	cx := C.int32_t(x)
 	cy := C.int32_t(y)
 
-	display := displayIdx(displayId...)
-	color := C.get_px_color(cx, cy, C.int32_t(display))
+	color := C.get_px_color(cx, cy, C.int32_t(-1))
 	return color
 }
 
 // GetPixelColor get the pixel color return string
-func GetPixelColor(x, y int, displayId ...int) string {
-	return PadHex(GetPxColor(x, y, displayId...))
+func GetPixelColor(x, y int) string {
+	return PadHex(GetPxColor(x, y))
 }
 
 // GetLocationColor get the location pos's color
-func GetLocationColor(displayId ...int) string {
+func GetLocationColor() string {
 	x, y := Location()
-	return GetPixelColor(x, y, displayId...)
+	return GetPixelColor(x, y)
 }
 
 // IsMain is main display
 func IsMain(displayId int) bool {
 	return displayId == GetMainId()
-}
-
-func displayIdx(id ...int) int {
-	display := -1
-	if DisplayID != -1 {
-		display = DisplayID
-	}
-	if len(id) > 0 {
-		display = id[0]
-	}
-
-	return display
 }
 
 func getNumDisplays() int {
@@ -259,62 +241,15 @@ func GetHWNDByPid(pid int) int {
 	return int(C.get_hwnd_by_pid(C.uintptr(pid)))
 }
 
-// SysScale get the sys scale
-func SysScale(displayId ...int) float64 {
-	display := displayIdx(displayId...)
-	s := C.sys_scale(C.int32_t(display))
-	return float64(s)
-}
-
-// Scaled get the screen scaled return scale size
-func Scaled(x int, displayId ...int) int {
-	f := ScaleF(displayId...)
-	return Scaled0(x, f)
-}
-
-// Scaled0 return int(x * f)
-func Scaled0(x int, f float64) int {
-	return int(float64(x) * f)
-}
-
-// Scaled1 return int(x / f)
-func Scaled1(x int, f float64) int {
-	return int(float64(x) / f)
-}
-
 // GetScreenSize get the screen size
 func GetScreenSize() (int, int) {
 	size := C.getMainDisplaySize()
 	return int(size.w), int(size.h)
 }
 
-// GetScreenRect get the screen rect (x, y, w, h)
-func GetScreenRect(displayId ...int) Rect {
-	display := -1
-	if len(displayId) > 0 {
-		display = displayId[0]
-	}
-
-	rect := C.getScreenRect(C.int32_t(display))
-	x, y, w, h := int(rect.origin.x), int(rect.origin.y),
-		int(rect.size.w), int(rect.size.h)
-
-	if runtime.GOOS == "windows" {
-		// f := ScaleF(displayId...)
-		f := ScaleF()
-		x, y, w, h = Scaled0(x, f), Scaled0(y, f), Scaled0(w, f), Scaled0(h, f)
-	}
-	return Rect{
-		Point{X: x, Y: y},
-		Size{W: w, H: h},
-	}
-}
-
-// GetScaleSize get the screen scale size
-func GetScaleSize(displayId ...int) (int, int) {
-	x, y := GetScreenSize()
-	f := ScaleF(displayId...)
-	return int(float64(x) * f), int(float64(y) * f)
+// GetScreenRect get the main screen rect (x, y, w, h)
+func GetScreenRect() Rect {
+	return MainDisplay().Origin()
 }
 
 // CaptureScreen capture the screen return bitmap(c struct),
@@ -323,38 +258,27 @@ func GetScaleSize(displayId ...int) (int, int) {
 // robotgo.CaptureScreen(x, y, w, h int)
 func CaptureScreen(args ...int) CBitmap {
 	var x, y, w, h C.int32_t
-	displayId := -1
-	if DisplayID != -1 {
-		displayId = DisplayID
-	}
 
-	if len(args) > 4 {
-		displayId = args[4]
-	}
-
-	if len(args) > 3 {
+	if len(args) >= 4 {
 		x = C.int32_t(args[0])
 		y = C.int32_t(args[1])
 		w = C.int32_t(args[2])
 		h = C.int32_t(args[3])
 	} else {
 		// Get the main screen rect.
-		rect := GetScreenRect(displayId)
-		if runtime.GOOS == "windows" {
-			x = C.int32_t(rect.X)
-			y = C.int32_t(rect.Y)
-		}
-
+		rect := GetScreenRect()
+		x = C.int32_t(rect.X)
+		y = C.int32_t(rect.Y)
 		w = C.int32_t(rect.W)
 		h = C.int32_t(rect.H)
 	}
 
 	isPid := 0
-	if NotPid || len(args) > 5 {
+	if NotPid || len(args) > 4 {
 		isPid = 1
 	}
 
-	bit := C.capture_screen(x, y, w, h, C.int32_t(displayId), C.int8_t(isPid))
+	bit := C.capture_screen(x, y, w, h, C.int32_t(-1), C.int8_t(isPid))
 	return CBitmap(bit)
 }
 
@@ -522,25 +446,13 @@ func MouseButtonString(btn C.MMMouseButton) string {
 	return fmt.Sprintf("button%d", btn)
 }
 
-// MoveScale calculate the os scale factor x, y
-func MoveScale(x, y int, displayId ...int) (int, int) {
-	if Scale || runtime.GOOS == "windows" {
-		f := ScaleF()
-		x, y = Scaled1(x, f), Scaled1(y, f)
-	}
-
-	return x, y
-}
-
-// Move move the mouse to (x, y)
+// Move move the mouse to (x, y) using absolute coordinates
 //
 // Examples:
 //
 //	robotgo.MouseSleep = 100  // 100 millisecond
 //	robotgo.Move(10, 10)
-func Move(x, y int, displayId ...int) {
-	x, y = MoveScale(x, y, displayId...)
-
+func Move(x, y int) {
 	cx := C.int32_t(x)
 	cy := C.int32_t(y)
 	C.moveMouse(C.MMPointInt32Make(cx, cy))
@@ -553,8 +465,6 @@ func Move(x, y int, displayId ...int) {
 // Drag drag the mouse to (x, y),
 // It's not valid now, use the DragSmooth()
 func Drag(x, y int, args ...string) {
-	x, y = MoveScale(x, y)
-
 	var button C.MMMouseButton = C.LEFT_BUTTON
 	cx := C.int32_t(x)
 	cy := C.int32_t(y)
@@ -589,12 +499,6 @@ func DragSmooth(x, y int, args ...interface{}) {
 //	robotgo.MoveSmooth(10, 10)
 //	robotgo.MoveSmooth(10, 10, 1.0, 2.0)
 func MoveSmooth(x, y int, args ...interface{}) bool {
-	// if runtime.GOOS == "windows" {
-	// 	f := ScaleF()
-	// 	x, y = Scaled0(x, f), Scaled0(y, f)
-	// }
-	x, y = MoveScale(x, y)
-
 	cx := C.int32_t(x)
 	cy := C.int32_t(y)
 
@@ -645,15 +549,7 @@ func MoveSmoothRelative(x, y int, args ...interface{}) {
 // Location get the mouse location position return x, y
 func Location() (int, int) {
 	pos := C.location()
-	x := int(pos.x)
-	y := int(pos.y)
-
-	if Scale || runtime.GOOS == "windows" {
-		f := ScaleF()
-		x, y = Scaled0(x, f), Scaled0(y, f)
-	}
-
-	return x, y
+	return int(pos.x), int(pos.y)
 }
 
 // Click click the mouse button
