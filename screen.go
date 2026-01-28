@@ -14,8 +14,7 @@ package robotgo
 import (
 	"image"
 
-	// "github.com/kbinani/screenshot"
-	"github.com/vcaesar/screenshot"
+	"github.com/kbinani/screenshot"
 )
 
 // GetDisplayBounds gets the display screen bounds
@@ -34,20 +33,11 @@ func GetDisplayRect(i int) Rect {
 
 // Capture capture the screenshot, use the CaptureImg default
 func Capture(args ...int) (*image.RGBA, error) {
-	displayId := 0
-	if DisplayID != -1 {
-		displayId = DisplayID
-	}
-
-	if len(args) > 4 {
-		displayId = args[4]
-	}
-
 	var x, y, w, h int
-	if len(args) > 3 {
+	if len(args) >= 4 {
 		x, y, w, h = args[0], args[1], args[2], args[3]
 	} else {
-		x, y, w, h = GetDisplayBounds(displayId)
+		x, y, w, h = GetDisplayBounds(0)
 	}
 
 	return screenshot.Capture(x, y, w, h)

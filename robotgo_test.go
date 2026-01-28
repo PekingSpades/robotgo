@@ -35,9 +35,9 @@ func TestSize(t *testing.T) {
 	tt.NotZero(t, x)
 	tt.NotZero(t, y)
 
-	x, y = GetScaleSize()
-	tt.NotZero(t, x)
-	tt.NotZero(t, y)
+	rect := GetScreenRect()
+	tt.NotZero(t, rect.W)
+	tt.NotZero(t, rect.H)
 }
 
 func TestMoveMouse(t *testing.T) {
@@ -118,13 +118,13 @@ func TestMouseToggle(t *testing.T) {
 }
 
 func TestKey(t *testing.T) {
-	e := KeyTap("v", "cmd")
+	e := KeyTap("v", ModCmd)
 	tt.Nil(t, e)
 
 	e = KeyTap("enter")
 	tt.Nil(t, e)
 
-	e = KeyToggle("v", "up")
+	e = KeyToggle("v", false)
 	tt.Nil(t, e)
 
 	e = KeyDown("a")
@@ -223,7 +223,7 @@ func TestPs(t *testing.T) {
 	tt.Nil(t, err)
 
 	if len(id) > 0 {
-		e := KeyTap("v", id[0], "cmd")
+		e := KeyTapWithPID("v", id[0], ModCmd)
 		tt.Nil(t, e)
 	}
 
