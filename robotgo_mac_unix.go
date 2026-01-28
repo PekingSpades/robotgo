@@ -9,17 +9,16 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#ifndef DISPLAY_C_H
-#define DISPLAY_C_H
+//go:build !windows
+// +build !windows
 
-#include "../base/os.h"
+package robotgo
 
-#if defined(IS_MACOSX)
-    #include "display_c_macos.h"
-#elif defined(USE_X11)
-    #include "display_c_x11.h"
-#elif defined(IS_WINDOWS)
-    #include "display_c_windows.h"
-#endif
-
-#endif /* DISPLAY_C_H */
+// ScaleF get the system scale val
+func ScaleF(displayId ...int) float64 {
+	f := SysScale(displayId...)
+	if f == 0.0 {
+		f = 1.0
+	}
+	return f
+}

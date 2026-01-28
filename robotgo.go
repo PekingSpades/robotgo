@@ -34,7 +34,10 @@ package robotgo
 #cgo darwin CFLAGS: -x objective-c -Wno-deprecated-declarations
 #cgo darwin LDFLAGS: -framework Cocoa -framework CoreFoundation -framework IOKit
 #cgo darwin LDFLAGS: -framework Carbon -framework OpenGL
-#cgo darwin LDFLAGS: -weak_framework ScreenCaptureKit
+//
+#if __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ > 140400
+#cgo darwin LDFLAGS: -framework ScreenCaptureKit
+#endif
 
 #cgo linux CFLAGS: -I/usr/src
 #cgo linux LDFLAGS: -L/usr/src -lm -lX11 -lXtst
@@ -75,8 +78,13 @@ var (
 	// KeySleep set the key default millisecond sleep time
 	KeySleep = 10
 
+	// DisplayID set the screen display id
+	DisplayID = -1
+
 	// NotPid used the hwnd not pid in windows
 	NotPid bool
+	// Scale option the os screen scale
+	Scale bool
 )
 
 type (
@@ -208,28 +216,41 @@ func RgbToHex(r, g, b uint8) C.uint32_t {
 }
 
 // GetPxColor get the pixel color return C.MMRGBHex
-func GetPxColor(x, y int) C.MMRGBHex {
+func GetPxColor(x, y int, displayId ...int) C.MMRGBHex {
 	cx := C.int32_t(x)
 	cy := C.int32_t(y)
 
-	color := C.get_px_color(cx, cy, C.int32_t(-1))
+	display := displayIdx(displayId...)
+	color := C.get_px_color(cx, cy, C.int32_t(display))
 	return color
 }
 
 // GetPixelColor get the pixel color return string
-func GetPixelColor(x, y int) string {
-	return PadHex(GetPxColor(x, y))
+func GetPixelColor(x, y int, displayId ...int) string {
+	return PadHex(GetPxColor(x, y, displayId...))
 }
 
 // GetLocationColor get the location pos's color
-func GetLocationColor() string {
+func GetLocationColor(displayId ...int) string {
 	x, y := Location()
-	return GetPixelColor(x, y)
+	return GetPixelColor(x, y, displayId...)
 }
 
 // IsMain is main display
 func IsMain(displayId int) bool {
 	return displayId == GetMainId()
+}
+
+func displayIdx(id ...int) int {
+	display := -1
+	if DisplayID != -1 {
+		display = DisplayID
+	}
+	if len(id) > 0 {
+		display = id[0]
+	}
+
+	return display
 }
 
 func getNumDisplays() int {
@@ -241,15 +262,62 @@ func GetHWNDByPid(pid int) int {
 	return int(C.get_hwnd_by_pid(C.uintptr(pid)))
 }
 
+// SysScale get the sys scale
+func SysScale(displayId ...int) float64 {
+	display := displayIdx(displayId...)
+	s := C.sys_scale(C.int32_t(display))
+	return float64(s)
+}
+
+// Scaled get the screen scaled return scale size
+func Scaled(x int, displayId ...int) int {
+	f := ScaleF(displayId...)
+	return Scaled0(x, f)
+}
+
+// Scaled0 return int(x * f)
+func Scaled0(x int, f float64) int {
+	return int(float64(x) * f)
+}
+
+// Scaled1 return int(x / f)
+func Scaled1(x int, f float64) int {
+	return int(float64(x) / f)
+}
+
 // GetScreenSize get the screen size
 func GetScreenSize() (int, int) {
 	size := C.getMainDisplaySize()
 	return int(size.w), int(size.h)
 }
 
-// GetScreenRect get the main screen rect (x, y, w, h)
-func GetScreenRect() Rect {
-	return MainDisplay().Origin()
+// GetScreenRect get the screen rect (x, y, w, h)
+func GetScreenRect(displayId ...int) Rect {
+	display := -1
+	if len(displayId) > 0 {
+		display = displayId[0]
+	}
+
+	rect := C.getScreenRect(C.int32_t(display))
+	x, y, w, h := int(rect.origin.x), int(rect.origin.y),
+		int(rect.size.w), int(rect.size.h)
+
+	if runtime.GOOS == "windows" {
+		// f := ScaleF(displayId...)
+		f := ScaleF()
+		x, y, w, h = Scaled0(x, f), Scaled0(y, f), Scaled0(w, f), Scaled0(h, f)
+	}
+	return Rect{
+		Point{X: x, Y: y},
+		Size{W: w, H: h},
+	}
+}
+
+// GetScaleSize get the screen scale size
+func GetScaleSize(displayId ...int) (int, int) {
+	x, y := GetScreenSize()
+	f := ScaleF(displayId...)
+	return int(float64(x) * f), int(float64(y) * f)
 }
 
 // CaptureScreen capture the screen return bitmap(c struct),
@@ -258,27 +326,38 @@ func GetScreenRect() Rect {
 // robotgo.CaptureScreen(x, y, w, h int)
 func CaptureScreen(args ...int) CBitmap {
 	var x, y, w, h C.int32_t
+	displayId := -1
+	if DisplayID != -1 {
+		displayId = DisplayID
+	}
 
-	if len(args) >= 4 {
+	if len(args) > 4 {
+		displayId = args[4]
+	}
+
+	if len(args) > 3 {
 		x = C.int32_t(args[0])
 		y = C.int32_t(args[1])
 		w = C.int32_t(args[2])
 		h = C.int32_t(args[3])
 	} else {
 		// Get the main screen rect.
-		rect := GetScreenRect()
-		x = C.int32_t(rect.X)
-		y = C.int32_t(rect.Y)
+		rect := GetScreenRect(displayId)
+		if runtime.GOOS == "windows" {
+			x = C.int32_t(rect.X)
+			y = C.int32_t(rect.Y)
+		}
+
 		w = C.int32_t(rect.W)
 		h = C.int32_t(rect.H)
 	}
 
 	isPid := 0
-	if NotPid || len(args) > 4 {
+	if NotPid || len(args) > 5 {
 		isPid = 1
 	}
 
-	bit := C.capture_screen(x, y, w, h, C.int32_t(-1), C.int8_t(isPid))
+	bit := C.capture_screen(x, y, w, h, C.int32_t(displayId), C.int8_t(isPid))
 	return CBitmap(bit)
 }
 
@@ -446,13 +525,25 @@ func MouseButtonString(btn C.MMMouseButton) string {
 	return fmt.Sprintf("button%d", btn)
 }
 
-// Move move the mouse to (x, y) using absolute coordinates
+// MoveScale calculate the os scale factor x, y
+func MoveScale(x, y int, displayId ...int) (int, int) {
+	if Scale || runtime.GOOS == "windows" {
+		f := ScaleF()
+		x, y = Scaled1(x, f), Scaled1(y, f)
+	}
+
+	return x, y
+}
+
+// Move move the mouse to (x, y)
 //
 // Examples:
 //
 //	robotgo.MouseSleep = 100  // 100 millisecond
 //	robotgo.Move(10, 10)
-func Move(x, y int) {
+func Move(x, y int, displayId ...int) {
+	x, y = MoveScale(x, y, displayId...)
+
 	cx := C.int32_t(x)
 	cy := C.int32_t(y)
 	C.moveMouse(C.MMPointInt32Make(cx, cy))
@@ -465,6 +556,8 @@ func Move(x, y int) {
 // Drag drag the mouse to (x, y),
 // It's not valid now, use the DragSmooth()
 func Drag(x, y int, args ...string) {
+	x, y = MoveScale(x, y)
+
 	var button C.MMMouseButton = C.LEFT_BUTTON
 	cx := C.int32_t(x)
 	cy := C.int32_t(y)
@@ -499,6 +592,12 @@ func DragSmooth(x, y int, args ...interface{}) {
 //	robotgo.MoveSmooth(10, 10)
 //	robotgo.MoveSmooth(10, 10, 1.0, 2.0)
 func MoveSmooth(x, y int, args ...interface{}) bool {
+	// if runtime.GOOS == "windows" {
+	// 	f := ScaleF()
+	// 	x, y = Scaled0(x, f), Scaled0(y, f)
+	// }
+	x, y = MoveScale(x, y)
+
 	cx := C.int32_t(x)
 	cy := C.int32_t(y)
 
@@ -549,7 +648,15 @@ func MoveSmoothRelative(x, y int, args ...interface{}) {
 // Location get the mouse location position return x, y
 func Location() (int, int) {
 	pos := C.location()
-	return int(pos.x), int(pos.y)
+	x := int(pos.x)
+	y := int(pos.y)
+
+	if Scale || runtime.GOOS == "windows" {
+		f := ScaleF()
+		x, y = Scaled0(x, f), Scaled0(y, f)
+	}
+
+	return x, y
 }
 
 // Click click the mouse button
@@ -576,9 +683,9 @@ func Click(args ...interface{}) {
 	}
 
 	if !double {
-		C.multiClickErr(button, 1)
+		C.clickMouse(button)
 	} else {
-		C.multiClickErr(button, 2)
+		C.doubleClick(button)
 	}
 
 	MilliSleep(MouseSleep)
@@ -616,19 +723,27 @@ func ClickE(args ...interface{}) error {
 
 	defer MilliSleep(MouseSleep)
 
-	clickCount := 1
-	if double {
-		clickCount = 2
-	}
+	if !double {
+		if code := C.toggleMouseErr(true, button); code != 0 {
+			return formatClickError(int(code), button, "down", false)
+		}
 
-	if code := C.multiClickErr(button, C.int(clickCount)); code != 0 {
-		return formatClickError(int(code), button, clickCount)
+		// match clickMouse timing
+		C.microsleep(C.double(5.0))
+
+		if code := C.toggleMouseErr(false, button); code != 0 {
+			return formatClickError(int(code), button, "up", false)
+		}
+	} else {
+		if code := C.doubleClickErr(button); code != 0 {
+			return formatClickError(int(code), button, "double", true)
+		}
 	}
 
 	return nil
 }
 
-func formatClickError(code int, button C.MMMouseButton, clickCount int) error {
+func formatClickError(code int, button C.MMMouseButton, stage string, double bool) error {
 	btnName := MouseButtonString(button)
 	detail := ""
 
@@ -661,28 +776,10 @@ func formatClickError(code int, button C.MMMouseButton, clickCount int) error {
 	}
 
 	if detail != "" {
-		return fmt.Errorf("click failed (%s, count=%d): %s (code=%d)", btnName, clickCount, detail, code)
+		return fmt.Errorf("click %s failed (%s, double=%v): %s (code=%d)", stage, btnName, double, detail, code)
 	}
 
-	return fmt.Errorf("click failed (%s, count=%d), code=%d", btnName, clickCount, code)
-}
-
-// MultiClickE performs multiple clicks and returns error
-//
-// robotgo.MultiClickE(button string, clickCount int)
-func MultiClickE(button string, clickCount int) error {
-	if clickCount < 1 {
-		return nil
-	}
-
-	btn := CheckMouse(button)
-	defer MilliSleep(MouseSleep)
-
-	if code := C.multiClickErr(btn, C.int(clickCount)); code != 0 {
-		return formatClickError(int(code), btn, clickCount)
-	}
-
-	return nil
+	return fmt.Errorf("click %s failed (%s, double=%v), code=%d", stage, btnName, double, code)
 }
 
 // MoveClick move and click the mouse
@@ -727,7 +824,7 @@ func Toggle(key ...interface{}) error {
 	if len(key) > 1 && key[1].(string) == "up" {
 		down = false
 	}
-	C.toggleMouseErr(C.bool(down), button)
+	C.toggleMouse(C.bool(down), button)
 	if len(key) > 2 {
 		MilliSleep(MouseSleep)
 	}

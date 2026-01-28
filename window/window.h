@@ -350,7 +350,7 @@ void set_active(const MData win) {
 
 MData get_active(void) {
 #if defined(IS_MACOSX)
-	MData result = {0};
+	MData result;
 	// Ignore deprecated warnings
 	#pragma clang diagnostic push
 	#pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -367,10 +367,10 @@ MData get_active(void) {
 	AXUIElementRef focused = AXUIElementCreateApplication(pid);
 	if (focused == NULL) { return result; } // Verify
 
-	AXUIElementRef element = NULL;
+	AXUIElementRef element;
 	CGWindowID win = 0;
 	// Retrieve the currently focused window
-	if (AXUIElementCopyAttributeValue(focused, kAXFocusedWindowAttribute, (CFTypeRef*) &element)
+	if (AXUIElementCopyAttributeValue(focused, kAXFocusedWindowAttribute, (CFTypeRef*) &element) 
 		== kAXErrorSuccess && element) {
 
 		// Use undocumented API to get WID
@@ -381,12 +381,15 @@ MData get_active(void) {
 		} else {
 			CFRelease(element);
 		}
+	} else {
+		result.CgID = win;
+		result.AxID = element;
 	}
 	CFRelease(focused);
 
 	return result;
 #elif defined(USE_X11)
-	MData result = {0};
+	MData result;
 	Display *rDisplay = XOpenDisplay(NULL);
 	// Check X-Window display
 	if (WM_ACTIVE == None || rDisplay == NULL) {
@@ -425,7 +428,7 @@ MData get_active(void) {
 	return result;
 #elif defined(IS_WINDOWS)
 	// Attempt to get the foreground window multiple times in case
-	MData result = {0};
+	MData result;
 
 	uint8_t times = 0;
 	while (++times < 20) {

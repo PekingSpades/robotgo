@@ -45,56 +45,55 @@ func keyTap() {
 	robotgo.KeySleep = 200
 	robotgo.KeyTap("a")
 	robotgo.MilliSleep(100)
-	robotgo.KeyTap("a", robotgo.ModCtrl)
+	robotgo.KeyTap("a", "ctrl")
 
 	// hide window
-	err := robotgo.KeyTap("h", robotgo.ModCmd)
+	err := robotgo.KeyTap("h", "cmd")
 	if err != nil {
 		fmt.Println("robotgo.KeyTap run error is: ", err)
 	}
 
-	robotgo.KeyTap("h", robotgo.ModCmd)
+	robotgo.KeyTap("h", "cmd")
 
 	// press "i", "alt", "command" Key combination
-	robotgo.KeyTap(robotgo.KeyI, robotgo.ModAlt, robotgo.ModCmd)
-	robotgo.KeyTap("i", robotgo.ModAlt, robotgo.ModCmd)
+	robotgo.KeyTap(robotgo.KeyI, robotgo.Alt, robotgo.Cmd)
+	robotgo.KeyTap("i", "alt", "cmd")
 
-	// Using multiple modifiers
-	robotgo.KeyTap("i", robotgo.ModAlt, robotgo.ModCmd)
-	robotgo.KeyTap("i", robotgo.ModAlt, robotgo.ModCmd)
+	arr := []string{"alt", "cmd"}
+	robotgo.KeyTap("i", arr)
+	robotgo.KeyTap("i", arr)
 
-	robotgo.KeyTap("i", robotgo.ModCmd, robotgo.ModAlt, robotgo.ModShift)
+	robotgo.KeyTap("i", "cmd", " alt", "shift")
 
 	// close window
-	robotgo.KeyTap("w", robotgo.ModCmd)
+	robotgo.KeyTap("w", "cmd")
 
 	// minimize window
-	robotgo.KeyTap("m", robotgo.ModCmd)
+	robotgo.KeyTap("m", "cmd")
 
-	robotgo.KeyTap("f1", robotgo.ModCtrl)
-	robotgo.KeyTap("a", robotgo.ModCtrl)
+	robotgo.KeyTap("f1", "ctrl")
+	robotgo.KeyTap("a", "control")
 }
 
 func special() {
 	robotgo.Type("{}")
-	robotgo.KeyTap("[")
-	robotgo.KeyTap("]")
+	robotgo.KeyTap("[", "]")
 
-	robotgo.KeyToggle("(", true)
-	robotgo.KeyToggle("(", false)
+	robotgo.KeyToggle("(")
+	robotgo.KeyToggle("(", "up")
 }
 
 func keyToggle() {
 	// robotgo.KeySleep = 150
-	robotgo.KeyToggle(robotgo.KeyA, true)
-	robotgo.KeyToggle("a", true, robotgo.ModAlt)
+	robotgo.KeyToggle(robotgo.KeyA)
+	robotgo.KeyToggle("a", "down", "alt")
 	robotgo.Sleep(1)
 
-	robotgo.KeyToggle("a", false, robotgo.ModAlt, robotgo.ModCmd)
+	robotgo.KeyToggle("a", "up", "alt", "cmd")
 	robotgo.MilliSleep(100)
-	robotgo.KeyToggle("q", false, robotgo.ModAlt, robotgo.ModCmd, robotgo.ModShift)
+	robotgo.KeyToggle("q", "up", "alt", "cmd", "shift")
 
-	err := robotgo.KeyToggle(robotgo.Enter, true)
+	err := robotgo.KeyToggle(robotgo.Enter)
 	if err != nil {
 		fmt.Println("robotgo.KeyToggle run error is: ", err)
 	}

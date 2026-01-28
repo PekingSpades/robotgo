@@ -11,13 +11,8 @@ require (
 	github.com/vcaesar/gops v0.41.0
 	github.com/vcaesar/imgo v0.41.0
 	github.com/vcaesar/keycode v0.10.1
+	github.com/vcaesar/screenshot v0.11.1
 	github.com/vcaesar/tt v0.20.1
-	golang.design/x/clipboard v0.7.0
-)
-
-require (
-	github.com/kbinani/screenshot v0.0.0-20250624051815-089614a94018
-	golang.org/x/image v0.34.0
 )
 
 require (
@@ -28,16 +23,14 @@ require (
 	github.com/godbus/dbus/v5 v5.2.0 // indirect
 	github.com/jezek/xgb v1.2.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20251013123823-9fd1530e3ec3 // indirect
-	github.com/lxn/win v0.0.0-20210218163916-a377121e959e // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/shirou/gopsutil/v4 v4.25.10 // indirect
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/exp v0.0.0-20251125195548-87e1e737ad39 // indirect
-	golang.org/x/exp/shiny v0.0.0-20251219203646-944ab1f22d93 // indirect
-	golang.org/x/mobile v0.0.0-20251126181937-5c265dc024c4 // indirect
-	golang.org/x/sys v0.39.0 // indirect
+	golang.org/x/image v0.33.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
 )
 
 // replace golang.org/x/sys => github.com/golang/sys v0.0.0-20190109145017-48ac38b7c8cb

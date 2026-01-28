@@ -22,90 +22,6 @@ import (
 	"github.com/tailscale/win"
 )
 
-// DPI awareness constants
-const (
-	DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = ^uintptr(3) // -4
-	DPI_AWARENESS_CONTEXT_UNAWARE              = ^uintptr(0) // -1
-	PROCESS_PER_MONITOR_DPI_AWARE              = 2
-
-	// Error codes
-	E_ACCESSDENIED = 0x80070005
-)
-
-// dpiAware indicates whether DPI awareness was successfully set.
-// If false, the process is DPI unaware and uses logical coordinates.
-var dpiAware bool
-
-func init() {
-	dpiAware = initDPIAwareness()
-}
-
-// IsDPIAware returns whether the process is DPI aware.
-// If false, all coordinate APIs use logical (scaled) coordinates.
-func IsDPIAware() bool {
-	return dpiAware
-}
-
-// initDPIAwareness sets the process DPI awareness to Per-Monitor V2.
-// This ensures GetPhysicalCursorPos and other APIs return true physical coordinates.
-// Returns true if DPI awareness was successfully set, false otherwise.
-func initDPIAwareness() bool {
-	user32 := syscall.NewLazyDLL("user32.dll")
-
-	// Try SetProcessDpiAwarenessContext first (Windows 10 1703+)
-	if proc := user32.NewProc("SetProcessDpiAwarenessContext"); proc.Find() == nil {
-		ret, _, _ := proc.Call(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)
-		if ret != 0 {
-			return true // Success
-		}
-		// Failed - might be already set or access denied
-		// Try to check if already DPI aware by querying current context
-		if getProc := user32.NewProc("GetThreadDpiAwarenessContext"); getProc.Find() == nil {
-			ctx, _, _ := getProc.Call()
-			if ctx != 0 {
-				// Use AreDpiAwarenessContextsEqual to properly compare contexts
-				if eqProc := user32.NewProc("AreDpiAwarenessContextsEqual"); eqProc.Find() == nil {
-					isUnaware, _, _ := eqProc.Call(ctx, DPI_AWARENESS_CONTEXT_UNAWARE)
-					if isUnaware == 0 { // Not equal to UNAWARE means DPI aware
-						return true
-					}
-				}
-			}
-		}
-	}
-
-	// Fallback to SetProcessDpiAwareness (Windows 8.1+)
-	shcore := syscall.NewLazyDLL("shcore.dll")
-	if proc := shcore.NewProc("SetProcessDpiAwareness"); proc.Find() == nil {
-		ret, _, _ := proc.Call(PROCESS_PER_MONITOR_DPI_AWARE)
-		// S_OK = 0, E_ACCESSDENIED means already set
-		if ret == 0 || ret == E_ACCESSDENIED {
-			// Check if we're actually DPI aware
-			if getProc := shcore.NewProc("GetProcessDpiAwareness"); getProc.Find() == nil {
-				var awareness uint32
-				getProc.Call(0, uintptr(unsafe.Pointer(&awareness)))
-				if awareness >= 1 { // PROCESS_SYSTEM_DPI_AWARE or higher
-					return true
-				}
-			}
-			if ret == 0 {
-				return true
-			}
-		}
-	}
-
-	// Fallback to SetProcessDPIAware (Vista+)
-	if proc := user32.NewProc("SetProcessDPIAware"); proc.Find() == nil {
-		ret, _, _ := proc.Call()
-		if ret != 0 {
-			return true
-		}
-	}
-
-	// All methods failed - process is DPI unaware
-	return false
-}
-
 // FindWindow find window hwnd by name
 func FindWindow(name string) win.HWND {
 	u1, _ := syscall.UTF16PtrFromString(name)
@@ -152,6 +68,28 @@ func GetMain() win.HWND {
 // GetMainId get the main display id
 func GetMainId() int {
 	return int(GetMain())
+}
+
+// ScaleF get the system scale value
+// if "displayId == -2" this function will get the desktop scale value
+func ScaleF(displayId ...int) (f float64) {
+	if len(displayId) > 0 && displayId[0] != -1 {
+		if displayId[0] >= 0 {
+			dpi := GetDPI(win.HWND(displayId[0]))
+			f = float64(dpi) / 96.0
+		}
+
+		if displayId[0] == -2 {
+			f = float64(GetDPI(GetDesktopWindow())) / 96.0
+		}
+	} else {
+		f = float64(GetMainDPI()) / 96.0
+	}
+
+	if f == 0.0 {
+		f = 1.0
+	}
+	return f
 }
 
 // GetDesktopWindow get the desktop window hwnd id

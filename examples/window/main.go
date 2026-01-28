@@ -56,11 +56,11 @@ func findIds() {
 	}
 
 	if len(fpid) > 0 {
-		robotgo.KeyTapWithPID("a", fpid[0])
+		robotgo.KeyTap("a", fpid[0])
 		robotgo.TypeStr("Hi galaxy!", fpid[0])
 
-		robotgo.KeyToggleWithPID("a", true, fpid[0], robotgo.ModCmd)
-		robotgo.KeyToggleWithPID("a", false, fpid[0], robotgo.ModCmd)
+		robotgo.KeyToggle("a", fpid[0], "cmd")
+		robotgo.KeyToggle("a", fpid[0], "cmd", "up")
 	}
 
 	fmt.Println("pids...", fpid)
