@@ -151,3 +151,7 @@ bool smoothlyMoveMouse(MMPointInt32 endPoint, double lowSpeed, double highSpeed)
 
 	return true;
 }
+
+bool smoothlyDragMouse(MMPointInt32 endPoint, MMMouseButton button, double lowSpeed, double highSpeed){
+	return smoothlyMoveMouse(endPoint, lowSpeed, highSpeed);
+}

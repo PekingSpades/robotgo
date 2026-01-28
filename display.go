@@ -136,6 +136,7 @@ func (d *Display) Info() DisplayInfo {
 // - Move(x, y int)
 // - MoveSmooth(x, y int, args ...interface{}) bool
 // - Drag(fromX, fromY, toX, toY int, button string)
+// - DragSmooth(fromX, fromY, toX, toY int, button string, args ...interface{})
 // - DragTo(x, y int, button string)
 // - Capture() (*image.RGBA, error)
 // - CaptureRect(x, y, w, h int) (*image.RGBA, error)

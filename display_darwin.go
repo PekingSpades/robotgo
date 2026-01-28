@@ -192,10 +192,17 @@ func (d *Display) MoveSmooth(physX, physY int, args ...interface{}) bool {
 // Drag drags the mouse from one position to another on this display.
 // Coordinates are in physical pixels relative to this display.
 func (d *Display) Drag(fromX, fromY, toX, toY int, button string) {
+	d.DragSmooth(fromX, fromY, toX, toY, button)
+}
+
+// DragSmooth drags the mouse smoothly from one position to another on this display.
+// Coordinates are in physical pixels relative to this display.
+func (d *Display) DragSmooth(fromX, fromY, toX, toY int, button string, args ...interface{}) {
 	d.Move(fromX, fromY)
 	Toggle(button)
 	MilliSleep(50)
-	d.MoveSmooth(toX, toY)
+	virtAbsX, virtAbsY := d.ToAbsolute(toX, toY)
+	dragSmooth(virtAbsX, virtAbsY, button, args...)
 	Toggle(button, "up")
 }
 
@@ -204,7 +211,8 @@ func (d *Display) Drag(fromX, fromY, toX, toY int, button string) {
 func (d *Display) DragTo(physX, physY int, button string) {
 	Toggle(button)
 	MilliSleep(50)
-	d.MoveSmooth(physX, physY)
+	virtAbsX, virtAbsY := d.ToAbsolute(physX, physY)
+	dragSmooth(virtAbsX, virtAbsY, button)
 	Toggle(button, "up")
 }
 

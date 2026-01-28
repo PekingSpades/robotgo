@@ -485,8 +485,37 @@ func Drag(x, y int, args ...string) {
 func DragSmooth(x, y int, args ...interface{}) {
 	Toggle("left")
 	MilliSleep(50)
-	MoveSmooth(x, y, args...)
+	dragSmooth(x, y, "left", args...)
 	Toggle("left", "up")
+}
+
+func dragSmooth(x, y int, button string, args ...interface{}) bool {
+	cx := C.int32_t(x)
+	cy := C.int32_t(y)
+
+	var (
+		mouseDelay = 1
+		low        C.double
+		high       C.double
+	)
+
+	if len(args) > 2 {
+		mouseDelay = args[2].(int)
+	}
+
+	if len(args) > 1 {
+		low = C.double(args[0].(float64))
+		high = C.double(args[1].(float64))
+	} else {
+		low = 1.0
+		high = 3.0
+	}
+
+	btn := CheckMouse(button)
+	cbool := C.smoothlyDragMouse(C.MMPointInt32Make(cx, cy), btn, low, high)
+	MilliSleep(MouseSleep + mouseDelay)
+
+	return bool(cbool)
 }
 
 // MoveSmooth move the mouse smooth,
