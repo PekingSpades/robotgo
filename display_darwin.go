@@ -199,10 +199,12 @@ func (d *Display) Drag(fromX, fromY, toX, toY int, button string) {
 // Coordinates are in physical pixels relative to this display.
 func (d *Display) DragSmooth(fromX, fromY, toX, toY int, button string, args ...interface{}) {
 	d.Move(fromX, fromY)
+	MilliSleep(50)
 	Toggle(button)
 	MilliSleep(50)
 	virtAbsX, virtAbsY := d.ToAbsolute(toX, toY)
 	dragSmooth(virtAbsX, virtAbsY, button, args...)
+	MilliSleep(50)
 	Toggle(button, "up")
 }
 
@@ -213,6 +215,7 @@ func (d *Display) DragTo(physX, physY int, button string) {
 	MilliSleep(50)
 	virtAbsX, virtAbsY := d.ToAbsolute(physX, physY)
 	dragSmooth(virtAbsX, virtAbsY, button)
+	MilliSleep(50)
 	Toggle(button, "up")
 }
 
